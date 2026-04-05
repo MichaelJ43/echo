@@ -80,7 +80,7 @@ The app version is defined in `package.json`, `src-tauri/tauri.conf.json`, and `
 
 ### GitHub Actions: semver and releases
 
-- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits with `[skip ci]`, pushes to `main`, and creates a `v*` tag. That tag triggers the **Release** workflow.
+- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits, pushes to `main`, and pushes a `v*` tag. That tag triggers the **Release** workflow. **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used only for those pushes. Pushes with the default Actions token do **not** trigger other workflows, so without this PAT the Release workflow never runs.
 - **Manual minor or major:** In GitHub → **Actions** → **Version bump** → **Run workflow**, choose **minor** or **major**. The same bump → commit → tag flow runs with your selected segment.
 - **Local bump (any segment):** `npm run version:bump -- patch` (or `minor` / `major`).
 
@@ -101,7 +101,9 @@ The app checks for updates **on launch** and **every hour** while running (deskt
    - `src-tauri/*.key` and `src-tauri/*.key.pub` are **gitignored** so the generated files are not committed; the tracked copy of the public key is **`tauri.conf.json` only**.
 2. **Updater URL:** The default endpoint uses this repository. For forks, change the GitHub URL in `tauri.conf.json`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds when `GITHUB_REPOSITORY` is set.
 
-**Release workflow** (`.github/workflows/release.yml`) runs on **`v*` tags**, builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. It requires **`TAURI_SIGNING_PRIVATE_KEY`** in repository secrets.
+**Release workflow** (`.github/workflows/release.yml`) runs on **`v*` tags**, builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. It requires **`TAURI_SIGNING_PRIVATE_KEY`**. Automated releases also require **`RELEASE_PUSH_TOKEN`** on the **Version bump** workflow (see above).
+
+**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT so tag pushes trigger Release).
 
 ## License
 
