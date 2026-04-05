@@ -21,9 +21,9 @@ test.describe("Sidebar Menu (meta menu)", () => {
     await expect(menu.getByRole("button", { name: "Check for updates" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "View releases" })).toBeVisible();
     await expect(
-      menu.getByRole("button", { name: "Manage local secrets…" })
+      menu.getByRole("button", { name: "Manage local secrets" })
     ).toBeVisible();
-    await expect(menu.getByRole("button", { name: "About Echo…" })).toBeVisible();
+    await expect(menu.getByRole("button", { name: "About Echo" })).toBeVisible();
   });
 
   test("opens from right-click on Menu label", async ({ page }) => {

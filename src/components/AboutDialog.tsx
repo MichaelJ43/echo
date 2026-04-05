@@ -1,12 +1,11 @@
 import { useRef } from "react";
 import { APP_VERSION } from "../appVersion";
+import { openGitHubRepoPage } from "../lib/updater";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
-
-const REPO_URL = "https://github.com/MichaelJ43/echo";
 
 export function AboutDialog({ open, onClose }: Props) {
   const backdropDownRef = useRef(false);
@@ -61,9 +60,14 @@ export function AboutDialog({ open, onClose }: Props) {
             HTTP APIs—collections, environments, authentication, and responses.
           </p>
           <p>
-            <a href={REPO_URL} target="_blank" rel="noreferrer">
+            <button
+              type="button"
+              className="about-dialog-link"
+              data-testid="about-github-link"
+              onClick={() => void openGitHubRepoPage()}
+            >
               GitHub
-            </a>
+            </button>
             {" · "}
             <span className="about-dialog-muted">MIT License</span>
           </p>

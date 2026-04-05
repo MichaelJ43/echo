@@ -877,7 +877,7 @@ export default function App() {
               setSecretsOpen(true);
             }}
           >
-            Manage local secrets…
+            Manage local secrets
           </button>
           <div className="context-menu-sep" role="separator" />
           <button
@@ -888,7 +888,7 @@ export default function App() {
               setAboutOpen(true);
             }}
           >
-            About Echo…
+            About Echo
           </button>
         </div>
       ) : null}

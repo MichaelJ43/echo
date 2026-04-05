@@ -11,6 +11,8 @@ const SS_DISMISSED = "echo.updater.dismissedThisSession";
 /** Matches `endpoints` in `src-tauri/tauri.conf.json` (GitHub Releases). */
 export const GITHUB_RELEASES_LATEST_URL = "https://github.com/MichaelJ43/echo/releases/latest";
 
+export const GITHUB_REPO_URL = "https://github.com/MichaelJ43/echo";
+
 function readSuppress(): boolean {
   try {
     return localStorage.getItem(LS_SUPPRESS) === "1";
@@ -77,6 +79,14 @@ export async function openGitHubReleasesPage(): Promise<void> {
     return;
   }
   window.open(GITHUB_RELEASES_LATEST_URL, "_blank", "noopener,noreferrer");
+}
+
+export async function openGitHubRepoPage(): Promise<void> {
+  if (isTauri()) {
+    await invoke("open_external_url", { url: GITHUB_REPO_URL });
+    return;
+  }
+  window.open(GITHUB_REPO_URL, "_blank", "noopener,noreferrer");
 }
 
 export type UpdateCheckScheduler = {
