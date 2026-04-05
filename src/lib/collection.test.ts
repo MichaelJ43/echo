@@ -9,6 +9,7 @@ import {
   firstRequestId,
   mapCollection,
   removeNodeById,
+  renameFolderById,
   requestToNode,
 } from "./collection";
 
@@ -45,6 +46,14 @@ describe("collection helpers", () => {
   it("maps a request", () => {
     const next = mapCollection(sample, "r1", (x) => ({ ...x, name: "B" }));
     expect(findRequest(next, "r1")?.name).toBe("B");
+  });
+
+  it("renames a folder by id", () => {
+    const next = renameFolderById(sample, "f1", "Renamed");
+    expect(next[0]?.nodeType).toBe("folder");
+    if (next[0]?.nodeType === "folder") {
+      expect(next[0].name).toBe("Renamed");
+    }
   });
 
   it("returns first request id", () => {

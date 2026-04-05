@@ -130,6 +130,25 @@ export function mapCollection(
   });
 }
 
+export function renameFolderById(
+  nodes: CollectionNode[],
+  folderId: string,
+  name: string
+): CollectionNode[] {
+  return nodes.map((n) => {
+    if (n.nodeType === "folder") {
+      if (n.id === folderId) {
+        return { ...n, name };
+      }
+      return {
+        ...n,
+        children: renameFolderById(n.children, folderId, name),
+      };
+    }
+    return n;
+  });
+}
+
 export function firstRequestId(nodes: CollectionNode[]): string | null {
   for (const n of nodes) {
     if (n.nodeType === "request") return n.id;

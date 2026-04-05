@@ -21,8 +21,14 @@ import {
   mapCollection,
   mapEveryRequest,
   removeNodeById,
+  renameFolderById,
   requestToNode,
 } from "./lib/collection";
+import {
+  sanitizeExportFilenameBase,
+  sliceWorkspaceForFolderExport,
+  sliceWorkspaceForRequestExport,
+} from "./lib/workspaceSlice";
 import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
 import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
@@ -205,7 +211,7 @@ export default function App() {
     }
   }, [state, activeRequest, activeEnv]);
 
-  const onExport = useCallback(async () => {
+  const onExportWorkspace = useCallback(async () => {
     if (!state) return;
     const file = await save({
       filters: [{ name: "Echo workspace", extensions: ["json"] }],
@@ -214,6 +220,67 @@ export default function App() {
     if (file === null) return;
     await exportWorkspaceFile(file, state);
   }, [state]);
+
+  const onExportFolder = useCallback(
+    async (folderId: string, folderName: string) => {
+      if (!state) return;
+      const payload = sliceWorkspaceForFolderExport(state, folderId);
+      if (!payload) return;
+      const base = sanitizeExportFilenameBase(folderName);
+      const file = await save({
+        filters: [{ name: "Echo workspace", extensions: ["json"] }],
+        defaultPath: `${base}.json`,
+      });
+      if (file === null) return;
+      await exportWorkspaceFile(file, payload);
+    },
+    [state]
+  );
+
+  const onExportRequest = useCallback(
+    async (requestId: string, requestName: string) => {
+      if (!state) return;
+      const payload = sliceWorkspaceForRequestExport(state, requestId);
+      if (!payload) return;
+      const base = sanitizeExportFilenameBase(requestName);
+      const file = await save({
+        filters: [{ name: "Echo workspace", extensions: ["json"] }],
+        defaultPath: `${base}.json`,
+      });
+      if (file === null) return;
+      await exportWorkspaceFile(file, payload);
+    },
+    [state]
+  );
+
+  const onRenameFolder = useCallback((folderId: string, currentName: string) => {
+    const name = window.prompt("Folder name", currentName);
+    if (name === null) return;
+    const trimmed = name.trim() || currentName;
+    setState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        collections: renameFolderById(prev.collections, folderId, trimmed),
+      };
+    });
+  }, []);
+
+  const onRenameRequest = useCallback((requestId: string, currentName: string) => {
+    const name = window.prompt("Request name", currentName);
+    if (name === null) return;
+    const trimmed = name.trim() || currentName;
+    setState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        collections: mapCollection(prev.collections, requestId, (r) => ({
+          ...r,
+          name: trimmed,
+        })),
+      };
+    });
+  }, []);
 
   const onImport = useCallback(async () => {
     const file = await open({
@@ -231,9 +298,9 @@ export default function App() {
   }, []);
 
   const onCreateRootFolder = useCallback(() => {
-    const name = window.prompt("Collection name", "New collection");
+    const name = window.prompt("Folder name", "My folder");
     if (name === null) return;
-    const trimmed = name.trim() || "New collection";
+    const trimmed = name.trim() || "My folder";
     setState((prev) => {
       if (!prev) return prev;
       const folder = createFolderNode(trimmed);
@@ -496,11 +563,11 @@ export default function App() {
           <button
             type="button"
             className="sidebar-header-action"
-            title="New collection (root folder)"
-            data-testid="create-root-collection"
+            title="New root folder"
+            data-testid="create-root-folder"
             onClick={() => onCreateRootFolder()}
           >
-            + Collection
+            + Folder
           </button>
         </div>
         <div className="tree">
@@ -512,8 +579,11 @@ export default function App() {
             onSelectRequest={(id) =>
               setState((s) => (s ? { ...s, activeRequestId: id } : s))
             }
-            onExport={onExport}
+            onExportFolder={onExportFolder}
             onImport={onImport}
+            onRenameFolder={onRenameFolder}
+            onExportRequest={onExportRequest}
+            onRenameRequest={onRenameRequest}
             onCreateFolderInFolder={onCreateFolderInFolder}
             onCreateRequestInFolder={onCreateRequestInFolder}
             onDeleteFolder={onDeleteFolder}
@@ -878,6 +948,17 @@ export default function App() {
             }}
           >
             Manage local secrets
+          </button>
+          <div className="context-menu-sep" role="separator" />
+          <button
+            type="button"
+            data-testid="meta-menu-export-workspace"
+            onClick={() => {
+              setMetaMenu(null);
+              void onExportWorkspace();
+            }}
+          >
+            Export workspace…
           </button>
           <div className="context-menu-sep" role="separator" />
           <button
