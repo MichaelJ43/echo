@@ -58,7 +58,7 @@ cd src-tauri && cargo test
 
 ## Icons and assets
 
-The canonical master icon is **`docs/logo-source.png`**. Running **`npm run icons`** (on **Windows**, or with a **square 1024×1024** source on other OSes) produces **`logo.png`**, **`public/logo.png`**, and **`src-tauri/icons/*`**. See **`scripts/make-icon.mjs`** and **`scripts/crop-logo-to-square.ps1`**.
+The canonical master icon is **`docs/logo-source.png`**. Running **`npm run icons`** (with **Python** and **`pip install -r scripts/requirements-images.txt`** for Pillow) produces **`logo.png`**, **`public/logo.png`**, and **`src-tauri/icons/*`**. Non-square sources are cropped via **`scripts/crop-logo-to-square.py`**. See **`scripts/make-icon.mjs`**.
 
 **GitHub social preview:** **`scripts/compose-social-preview.py`** draws the 1280×640 background in Pillow (flat background + text on the right — **no** dimension labels), centers a square crop of **`logo-source`** in the **left third**, and writes **`docs/github-social-preview.png`**. It also saves **`docs/github-social-preview-template.png`** as the same layout **without** the logo (reference only). Edit **`build_template()`** in that script to change colors or typography; do not rely on hand-drawn template PNGs with rulers. Install **Python** and **`pip install -r scripts/requirements-images.txt`** (Pillow), then **`npm run icons`**.
 

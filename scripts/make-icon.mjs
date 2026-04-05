@@ -3,8 +3,8 @@
  * then run: `tauri icon logo.png` (see `npm run icons`).
  *
  * - If the source is already 1024×1024 square, it is copied.
- * - On Windows, non-square sources are center-cropped via `crop-logo-to-square.ps1`.
- * - On other OSes, replace `docs/logo-source.png` with a square master or run this on Windows once.
+ * - Otherwise center-crop + resize via `crop-logo-to-square.py` (Pillow; see
+ *   `scripts/requirements-images.txt`).
  */
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -15,6 +15,7 @@ import { platform } from "node:os";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const src = join(root, "docs", "logo-source.png");
+const cropPy = join(__dirname, "crop-logo-to-square.py");
 
 function pngDimensions(buf) {
   const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -22,6 +23,37 @@ function pngDimensions(buf) {
   const i = buf.indexOf(Buffer.from("IHDR"));
   if (i < 0) return null;
   return { w: buf.readUInt32BE(i + 4), h: buf.readUInt32BE(i + 8) };
+}
+
+function shouldTryNext(r) {
+  if (r.error?.code === "ENOENT") return true;
+  if (r.status === 9009) return true;
+  return false;
+}
+
+/** Run crop-logo-to-square.py; same Python resolution as run-compose-social.mjs */
+function runCropScript() {
+  const attempts = [
+    ["python", [cropPy]],
+    ["python3", [cropPy]],
+    ["py", ["-3", cropPy]],
+  ];
+  for (const [cmd, args] of attempts) {
+    const r =
+      platform() === "win32"
+        ? spawnSync("cmd.exe", ["/c", cmd, ...args], {
+            cwd: root,
+            stdio: "inherit",
+          })
+        : spawnSync(cmd, args, { cwd: root, stdio: "inherit" });
+    if (shouldTryNext(r)) continue;
+    return r.status ?? 0;
+  }
+  console.error(
+    "crop-logo-to-square: Python not found, or Pillow missing.\n" +
+      "  Install Python and run: pip install -r scripts/requirements-images.txt"
+  );
+  return 1;
 }
 
 if (!existsSync(src)) {
@@ -44,17 +76,7 @@ if (dim.w === dim.h && dim.w === 1024) {
   copyFileSync(src, dstRoot);
   copyFileSync(src, dstPublic);
   console.log("Square 1024×1024: copied docs/logo-source.png → logo.png and public/logo.png");
-} else if (platform() === "win32") {
-  const ps = join(__dirname, "crop-logo-to-square.ps1");
-  const r = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
-    { cwd: root, stdio: "inherit" }
-  );
-  if (r.status !== 0) process.exit(r.status ?? 1);
 } else {
-  console.error(
-    `docs/logo-source.png is ${dim.w}×${dim.h} (Tauri requires a square source). On Windows run: npm run icons. Or replace docs/logo-source.png with a 1024×1024 square PNG.`
-  );
-  process.exit(1);
+  const code = runCropScript();
+  process.exit(code);
 }
