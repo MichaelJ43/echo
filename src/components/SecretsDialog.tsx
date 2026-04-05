@@ -65,6 +65,7 @@ export function SecretsDialog({ open, onClose }: Props) {
   return (
     <div
       className="secrets-dialog-backdrop"
+      data-testid="secrets-dialog-backdrop"
       role="presentation"
       onMouseDown={(e) => {
         if (e.button !== 0) return;
@@ -83,6 +84,7 @@ export function SecretsDialog({ open, onClose }: Props) {
     >
       <div
         className="secrets-dialog"
+        data-testid="secrets-dialog"
         role="dialog"
         aria-labelledby="secrets-dialog-title"
       >
@@ -91,6 +93,7 @@ export function SecretsDialog({ open, onClose }: Props) {
           <button
             type="button"
             className="secrets-dialog-close"
+            data-testid="secrets-dialog-close"
             aria-label="Close"
             onClick={onClose}
           >

@@ -56,6 +56,8 @@ npm test
 cd src-tauri && cargo test
 ```
 
+**End-to-end (Playwright, Chromium):** requires browsers once — `npx playwright install chromium`. By default `npm run test:e2e` starts `npm run dev` automatically; if you already have the dev server on the same URL, use `PLAYWRIGHT_SKIP_WEBSERVER=1 npm run test:e2e`. Override the base URL with `PW_BASE_URL` if needed.
+
 ## Icons and assets
 
 The canonical master icon is **`docs/logo-source.png`**. Running **`npm run icons`** (with **Python** and **`pip install -r scripts/requirements-images.txt`** for Pillow) produces **`logo.png`**, **`public/logo.png`**, and **`src-tauri/icons/*`**. Non-square sources are cropped via **`scripts/crop-logo-to-square.py`**. See **`scripts/make-icon.mjs`**.

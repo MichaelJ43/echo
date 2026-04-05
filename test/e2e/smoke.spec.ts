@@ -1,11 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Echo (web build smoke)", () => {
-  test("placeholder — run against `vite dev` with PW_BASE_URL", async ({
+  test("loads the app (uses playwright.config baseURL or PW_BASE_URL)", async ({
     page,
   }) => {
-    const base = process.env.PW_BASE_URL ?? "http://127.0.0.1:1420";
-    await page.goto(base);
-    await expect(page.getByTestId("loading")).toBeHidden({ timeout: 15000 });
+    await page.goto("/");
+    await expect(page.getByTestId("loading")).toBeHidden({ timeout: 15_000 });
   });
 });
