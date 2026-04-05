@@ -10,6 +10,7 @@
     "dialog:allow-save",
     "updater:default",
     "process:default",
+    "allow-echo-core",
     "allow-open-external-url",
     "allow-secrets"
   ]

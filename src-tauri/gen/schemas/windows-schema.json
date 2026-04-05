@@ -177,6 +177,12 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Workspace persistence, HTTP client, and file read/write helpers.",
+          "type": "string",
+          "const": "allow-echo-core",
+          "markdownDescription": "Workspace persistence, HTTP client, and file read/write helpers."
+        },
+        {
           "description": "Open HTTPS URLs in the system default browser (GitHub releases).",
           "type": "string",
           "const": "allow-open-external-url",
