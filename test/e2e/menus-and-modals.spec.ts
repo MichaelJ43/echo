@@ -16,6 +16,7 @@ test.describe("Sidebar Menu (meta menu)", () => {
     await expect(menu.getByTestId("meta-menu-check-updates")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-view-releases")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-secrets")).toBeVisible();
+    await expect(menu.getByTestId("meta-menu-export-workspace")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-about")).toBeVisible();
 
     await expect(menu.getByRole("button", { name: "Check for updates" })).toBeVisible();
@@ -23,6 +24,7 @@ test.describe("Sidebar Menu (meta menu)", () => {
     await expect(
       menu.getByRole("button", { name: "Manage local secrets" })
     ).toBeVisible();
+    await expect(menu.getByRole("button", { name: "Export workspace…" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "About Echo" })).toBeVisible();
   });
 
@@ -65,8 +67,8 @@ test.describe("Sidebar Menu (meta menu)", () => {
   });
 });
 
-test.describe("Collection tree context menus", () => {
-  test("folder row opens folder context menu with workspace actions", async ({
+test.describe("Folder tree context menus", () => {
+  test("folder row opens folder context menu with export and rename actions", async ({
     page,
   }) => {
     await gotoLoaded(page);
@@ -78,12 +80,15 @@ test.describe("Collection tree context menus", () => {
     await expect(menu).toBeVisible();
     await expect(menu.getByTestId("create-folder-in-folder")).toBeVisible();
     await expect(menu.getByTestId("create-request-in-folder")).toBeVisible();
-    await expect(menu.getByTestId("export-workspace")).toBeVisible();
+    await expect(menu.getByTestId("export-folder")).toBeVisible();
     await expect(menu.getByTestId("import-workspace")).toBeVisible();
+    await expect(menu.getByTestId("rename-folder")).toBeVisible();
     await expect(menu.getByTestId("delete-folder")).toBeVisible();
   });
 
-  test("request row opens request context menu", async ({ page }) => {
+  test("request row opens request context menu with export and rename", async ({
+    page,
+  }) => {
     await gotoLoaded(page);
 
     const requestRow = page.locator('[data-testid^="request-"]').first();
@@ -91,6 +96,8 @@ test.describe("Collection tree context menus", () => {
 
     const menu = page.getByTestId("request-context-menu");
     await expect(menu).toBeVisible();
+    await expect(menu.getByTestId("export-request")).toBeVisible();
+    await expect(menu.getByTestId("rename-request")).toBeVisible();
     await expect(menu.getByTestId("delete-request")).toBeVisible();
   });
 

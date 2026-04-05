@@ -17,7 +17,7 @@ export function createDefaultState(): AppState {
       {
         nodeType: "folder",
         id: fid,
-        name: "My collection",
+        name: "My folder",
         children: [
           {
             nodeType: "request",

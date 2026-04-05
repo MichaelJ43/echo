@@ -1,7 +1,7 @@
 import { useCallback, useState, type MouseEvent } from "react";
 import type { CollectionNode } from "../types";
 
-/** Single open context menu for the collection tree (only one at a time). */
+/** Single open context menu for the folder tree (only one at a time). */
 export type TreeMenuState = {
   kind: "folder" | "request";
   nodeId: string;
@@ -16,8 +16,11 @@ type Props = {
   treeMenu: TreeMenuState | null;
   setTreeMenu: (v: TreeMenuState | null) => void;
   onSelectRequest: (id: string) => void;
-  onExport: () => void | Promise<void>;
+  onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
   onImport: () => void | Promise<void>;
+  onRenameFolder: (folderId: string, folderName: string) => void;
+  onExportRequest: (requestId: string, requestName: string) => void | Promise<void>;
+  onRenameRequest: (requestId: string, requestName: string) => void;
   onCreateFolderInFolder: (parentFolderId: string) => void;
   onCreateRequestInFolder: (parentFolderId: string) => void;
   onDeleteFolder: (folderId: string, folderName: string) => void;
@@ -31,8 +34,11 @@ export function TreeNodes({
   treeMenu,
   setTreeMenu,
   onSelectRequest,
-  onExport,
+  onExportFolder,
   onImport,
+  onRenameFolder,
+  onExportRequest,
+  onRenameRequest,
   onCreateFolderInFolder,
   onCreateRequestInFolder,
   onDeleteFolder,
@@ -49,8 +55,11 @@ export function TreeNodes({
           treeMenu={treeMenu}
           setTreeMenu={setTreeMenu}
           onSelectRequest={onSelectRequest}
-          onExport={onExport}
+          onExportFolder={onExportFolder}
           onImport={onImport}
+          onRenameFolder={onRenameFolder}
+          onExportRequest={onExportRequest}
+          onRenameRequest={onRenameRequest}
           onCreateFolderInFolder={onCreateFolderInFolder}
           onCreateRequestInFolder={onCreateRequestInFolder}
           onDeleteFolder={onDeleteFolder}
@@ -68,8 +77,11 @@ function TreeNode({
   treeMenu,
   setTreeMenu,
   onSelectRequest,
-  onExport,
+  onExportFolder,
   onImport,
+  onRenameFolder,
+  onExportRequest,
+  onRenameRequest,
   onCreateFolderInFolder,
   onCreateRequestInFolder,
   onDeleteFolder,
@@ -81,8 +93,11 @@ function TreeNode({
   treeMenu: TreeMenuState | null;
   setTreeMenu: (v: TreeMenuState | null) => void;
   onSelectRequest: (id: string) => void;
-  onExport: () => void | Promise<void>;
+  onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
   onImport: () => void | Promise<void>;
+  onRenameFolder: (folderId: string, folderName: string) => void;
+  onExportRequest: (requestId: string, requestName: string) => void | Promise<void>;
+  onRenameRequest: (requestId: string, requestName: string) => void;
   onCreateFolderInFolder: (parentFolderId: string) => void;
   onCreateRequestInFolder: (parentFolderId: string) => void;
   onDeleteFolder: (folderId: string, folderName: string) => void;
@@ -180,13 +195,13 @@ function TreeNode({
             <div className="context-menu-sep" role="separator" />
             <button
               type="button"
-              data-testid="export-workspace"
+              data-testid="export-folder"
               onClick={() => {
                 setTreeMenu(null);
-                void onExport();
+                void onExportFolder(node.id, node.name);
               }}
             >
-              Export workspace…
+              Export folder…
             </button>
             <button
               type="button"
@@ -197,6 +212,17 @@ function TreeNode({
               }}
             >
               Import workspace…
+            </button>
+            <div className="context-menu-sep" role="separator" />
+            <button
+              type="button"
+              data-testid="rename-folder"
+              onClick={() => {
+                setTreeMenu(null);
+                onRenameFolder(node.id, node.name);
+              }}
+            >
+              Rename folder…
             </button>
             <div className="context-menu-sep" role="separator" />
             <button
@@ -220,8 +246,11 @@ function TreeNode({
             treeMenu={treeMenu}
             setTreeMenu={setTreeMenu}
             onSelectRequest={onSelectRequest}
-            onExport={onExport}
+            onExportFolder={onExportFolder}
             onImport={onImport}
+            onRenameFolder={onRenameFolder}
+            onExportRequest={onExportRequest}
+            onRenameRequest={onRenameRequest}
             onCreateFolderInFolder={onCreateFolderInFolder}
             onCreateRequestInFolder={onCreateRequestInFolder}
             onDeleteFolder={onDeleteFolder}
@@ -258,6 +287,27 @@ function TreeNode({
           role="menu"
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            data-testid="export-request"
+            onClick={() => {
+              setTreeMenu(null);
+              void onExportRequest(node.id, node.name);
+            }}
+          >
+            Export request…
+          </button>
+          <button
+            type="button"
+            data-testid="rename-request"
+            onClick={() => {
+              setTreeMenu(null);
+              onRenameRequest(node.id, node.name);
+            }}
+          >
+            Rename request…
+          </button>
+          <div className="context-menu-sep" role="separator" />
           <button
             type="button"
             className="danger"
