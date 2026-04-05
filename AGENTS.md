@@ -78,6 +78,7 @@ docs/                     # usage.md, architecture.md
 ## 5. Configuration and environment
 
 - **Tauri:** `src-tauri/tauri.conf.json` — app id `dev.echo.app`, window, bundle (`createUpdaterArtifacts`), `beforeDevCommand` / `frontendDist`, `plugins.updater` (pubkey + endpoints; GitHub `latest.json` URL).
+- **Tauri ACL:** `capabilities/default.json` references `permissions/*.toml`. Every custom `#[tauri::command]` must appear in a permission’s `commands.allow` (e.g. `echo-core.toml` for workspace load/save, `get_paths`, HTTP, import/export; `secrets.toml` / `open-external-url.toml` for those commands).
 - **Rust:** `src-tauri/Cargo.toml` — crate name `echo`, dependencies for `tauri`, `reqwest`, `tauri-plugin-updater`, `tauri-plugin-process`, etc.
 - **Secrets:** No API keys in repo; user data lives in app data. **Release signing:** `TAURI_SIGNING_PRIVATE_KEY` in GitHub Actions only (never commit the private key file). The **public** updater key in `tauri.conf.json` is **not** a secret (embedded for signature verification). Respect `.cursorignore` for `.env*`.
 - **Git and branches (required):**

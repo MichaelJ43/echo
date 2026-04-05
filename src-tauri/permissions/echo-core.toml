@@ -1,0 +1,13 @@
+[[permission]]
+identifier = "allow-echo-core"
+description = "Workspace persistence, HTTP client, and file read/write helpers."
+commands.allow = [
+  "get_paths",
+  "load_state",
+  "save_state",
+  "send_http_request",
+  "read_text_file",
+  "write_text_file",
+  "import_workspace_file",
+  "export_workspace_file",
+]
