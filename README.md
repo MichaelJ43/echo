@@ -33,6 +33,17 @@ Plain Vite (no native shell; workspace uses `localStorage`, HTTP uses `fetch`):
 npm run dev
 ```
 
+## Git workflow (branches and pull requests)
+
+Use **topic branches** and open **pull requests** into `main` instead of pushing straight to `main` when you want review and CI. Suggested prefixes:
+
+- `feat/` — new feature
+- `fix/` — bugfix
+- `chore/` — tooling, config, or dependencies
+- `docs/` — documentation only
+
+Merge when CI is green. The version-bump and release workflows still assume **`main`** as the default branch.
+
 ## Build
 
 Generate icon assets once (creates `logo.png` and `src-tauri/icons/*`):
@@ -79,16 +90,16 @@ Default branch is assumed to be **`main`**. If you use another name, update `ver
 
 The app checks for updates **on launch** and **every hour** while running (desktop build only). Updates are delivered from **GitHub Releases** via [`latest.json`](https://v2.tauri.app/plugin/updater/) (uploaded by `tauri-apps/tauri-action`).
 
-**One-time setup after you create the GitHub repo**
+**One-time setup (or key rotation)**
 
-1. **Signing keys** (updates must be signed; the private key never goes in git):
+1. **Signing keys** — The **public** key in `plugins.updater.pubkey` in `tauri.conf.json` is **supposed to be** in the repo: clients use it to verify update signatures. It is **not** a secret. The **private** key must **never** be committed.
    ```bash
-   npm run tauri -- signer generate --ci -w src-tauri/echo.key
+   npm run tauri -- signer generate --ci -w src-tauri/echo.key -f
    ```
-   - Copy the **public** key: contents of `src-tauri/echo.key.pub` into `src-tauri/tauri.conf.json` → `plugins.updater.pubkey` (replace the placeholder there if needed).
-   - Add a repository secret **`TAURI_SIGNING_PRIVATE_KEY`** with the **full contents** of `src-tauri/echo.key` (or use `TAURI_SIGNING_PRIVATE_KEY_PATH` in local builds only; `.env` does not apply to signing—see Tauri docs).
-   - Add `src-tauri/echo.key` to your local ignore habits; it is listed in `.gitignore`.
-2. **Updater URL:** In `tauri.conf.json`, replace `OWNER/REPO` in the updater endpoint with your GitHub `owner/repo`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds and sets the endpoint from `GITHUB_REPOSITORY`.
+   - Put the **public** key string (same as `echo.key.pub` on one line) into `plugins.updater.pubkey` in `tauri.conf.json` if you rotate keys.
+   - Add repository secret **`TAURI_SIGNING_PRIVATE_KEY`** with the **full contents** of `src-tauri/echo.key` (GitHub Actions release signing). For local release-style builds you can use `TAURI_SIGNING_PRIVATE_KEY_PATH` instead.
+   - `src-tauri/*.key` and `src-tauri/*.key.pub` are **gitignored** so the generated files are not committed; the tracked copy of the public key is **`tauri.conf.json` only**.
+2. **Updater URL:** The default endpoint uses this repository. For forks, change the GitHub URL in `tauri.conf.json`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds when `GITHUB_REPOSITORY` is set.
 
 **Release workflow** (`.github/workflows/release.yml`) runs on **`v*` tags**, builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. It requires **`TAURI_SIGNING_PRIVATE_KEY`** in repository secrets.
 
