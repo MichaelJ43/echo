@@ -25,8 +25,9 @@ import {
 import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
 import type { AppState, HttpResponsePayload, RequestItem } from "./types";
+import { AboutDialog } from "./components/AboutDialog";
 import { SecretsDialog } from "./components/SecretsDialog";
-import { TreeNodes } from "./components/TreeNodes";
+import { TreeNodes, type TreeMenuState } from "./components/TreeNodes";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import {
   fetchUpdateIfAvailable,
@@ -61,7 +62,11 @@ export default function App() {
   } | null>(null);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [metaMenu, setMetaMenu] = useState<{ x: number; y: number } | null>(null);
+  const [treeContextMenu, setTreeContextMenu] = useState<TreeMenuState | null>(
+    null
+  );
   const [secretsOpen, setSecretsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const activeEnv = useMemo(() => {
     if (!state) return null;
@@ -84,6 +89,28 @@ export default function App() {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [metaMenu]);
+
+  useEffect(() => {
+    if (!treeContextMenu) return;
+    const close = () => setTreeContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [treeContextMenu]);
+
+  /** Suppress the browser/Electron default context menu except on tree rows, menu trigger, and inputs. */
+  useEffect(() => {
+    const onContextMenu = (e: MouseEvent) => {
+      const el = e.target;
+      if (!(el instanceof Element)) return;
+      if (el.closest("[data-tree-context]")) return;
+      if (el.closest("[data-meta-menu-trigger]")) return;
+      if (el.closest("input, textarea, select")) return;
+      if (el.closest("a[href]")) return;
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", onContextMenu, true);
+    return () => document.removeEventListener("contextmenu", onContextMenu, true);
+  }, []);
 
   useEffect(() => {
     if (!infoToast || infoToast === "Checking for updates…") return;
@@ -287,10 +314,28 @@ export default function App() {
     });
   }, []);
 
-  const onCollectionsContextMenu = useCallback((e: ReactMouseEvent) => {
+  const onMetaMenuContextMenu = useCallback((e: ReactMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setTreeContextMenu(null);
     setMetaMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const onMetaMenuButtonClick = useCallback(
+    (e: ReactMouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      setTreeContextMenu(null);
+      const r = e.currentTarget.getBoundingClientRect();
+      setMetaMenu((prev) =>
+        prev ? null : { x: r.left, y: r.bottom + 4 }
+      );
+    },
+    []
+  );
+
+  const handleSetTreeMenu = useCallback((v: TreeMenuState | null) => {
+    if (v) setMetaMenu(null);
+    setTreeContextMenu(v);
   }, []);
 
   const onCheckUpdatesManual = useCallback(async () => {
@@ -363,13 +408,17 @@ export default function App() {
               height={26}
               decoding="async"
             />
-            <span
+            <button
+              type="button"
               className="sidebar-title-label"
-              title="Right-click for more"
-              onContextMenu={onCollectionsContextMenu}
+              data-testid="sidebar-menu-trigger"
+              data-meta-menu-trigger
+              title="Click or right-click for menu"
+              onClick={onMetaMenuButtonClick}
+              onContextMenu={onMetaMenuContextMenu}
             >
-              Collections
-            </span>
+              Menu
+            </button>
           </div>
           <button
             type="button"
@@ -385,6 +434,8 @@ export default function App() {
           <TreeNodes
             nodes={state.collections}
             activeId={state.activeRequestId}
+            treeMenu={treeContextMenu}
+            setTreeMenu={handleSetTreeMenu}
             onSelectRequest={(id) =>
               setState((s) => (s ? { ...s, activeRequestId: id } : s))
             }
@@ -709,8 +760,19 @@ export default function App() {
           >
             Manage local secrets…
           </button>
+          <div className="context-menu-sep" role="separator" />
+          <button
+            type="button"
+            onClick={() => {
+              setMetaMenu(null);
+              setAboutOpen(true);
+            }}
+          >
+            About Echo…
+          </button>
         </div>
       ) : null}
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <SecretsDialog open={secretsOpen} onClose={() => setSecretsOpen(false)} />
       {updateBanner ? (
         <UpdatePrompt

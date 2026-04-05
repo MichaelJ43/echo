@@ -1,10 +1,20 @@
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 import type { CollectionNode } from "../types";
+
+/** Single open context menu for the collection tree (only one at a time). */
+export type TreeMenuState = {
+  kind: "folder" | "request";
+  nodeId: string;
+  x: number;
+  y: number;
+};
 
 type Props = {
   nodes: CollectionNode[];
   depth?: number;
   activeId: string | null;
+  treeMenu: TreeMenuState | null;
+  setTreeMenu: (v: TreeMenuState | null) => void;
   onSelectRequest: (id: string) => void;
   onExport: () => void | Promise<void>;
   onImport: () => void | Promise<void>;
@@ -18,6 +28,8 @@ export function TreeNodes({
   nodes,
   depth = 0,
   activeId,
+  treeMenu,
+  setTreeMenu,
   onSelectRequest,
   onExport,
   onImport,
@@ -34,6 +46,8 @@ export function TreeNodes({
           node={n}
           depth={depth}
           activeId={activeId}
+          treeMenu={treeMenu}
+          setTreeMenu={setTreeMenu}
           onSelectRequest={onSelectRequest}
           onExport={onExport}
           onImport={onImport}
@@ -51,6 +65,8 @@ function TreeNode({
   node,
   depth,
   activeId,
+  treeMenu,
+  setTreeMenu,
   onSelectRequest,
   onExport,
   onImport,
@@ -62,6 +78,8 @@ function TreeNode({
   node: CollectionNode;
   depth: number;
   activeId: string | null;
+  treeMenu: TreeMenuState | null;
+  setTreeMenu: (v: TreeMenuState | null) => void;
   onSelectRequest: (id: string) => void;
   onExport: () => void | Promise<void>;
   onImport: () => void | Promise<void>;
@@ -70,24 +88,21 @@ function TreeNode({
   onDeleteFolder: (folderId: string, folderName: string) => void;
   onDeleteRequest: (requestId: string, requestName: string) => void;
 }) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   /** Only used when node is a folder; request rows ignore this state. */
   const [expanded, setExpanded] = useState(true);
-
-  useEffect(() => {
-    if (!menu) return;
-    const close = () => setMenu(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [menu]);
 
   const onCtxFolder = useCallback(
     (e: MouseEvent) => {
       if (node.nodeType !== "folder") return;
       e.preventDefault();
-      setMenu({ x: e.clientX, y: e.clientY });
+      setTreeMenu({
+        kind: "folder",
+        nodeId: node.id,
+        x: e.clientX,
+        y: e.clientY,
+      });
     },
-    [node]
+    [node, setTreeMenu]
   );
 
   const onCtxRequest = useCallback(
@@ -95,12 +110,20 @@ function TreeNode({
       if (node.nodeType !== "request") return;
       e.preventDefault();
       e.stopPropagation();
-      setMenu({ x: e.clientX, y: e.clientY });
+      setTreeMenu({
+        kind: "request",
+        nodeId: node.id,
+        x: e.clientX,
+        y: e.clientY,
+      });
     },
-    [node]
+    [node, setTreeMenu]
   );
 
   if (node.nodeType === "folder") {
+    const showFolderMenu =
+      treeMenu?.kind === "folder" && treeMenu.nodeId === node.id;
+
     return (
       <div>
         <div
@@ -109,6 +132,7 @@ function TreeNode({
           role="button"
           tabIndex={0}
           aria-expanded={expanded}
+          data-tree-context
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -125,10 +149,10 @@ function TreeNode({
           <span aria-hidden>📁</span>
           <span>{node.name}</span>
         </div>
-        {menu ? (
+        {showFolderMenu ? (
           <div
             className="context-menu"
-            style={{ left: menu.x, top: menu.y }}
+            style={{ left: treeMenu.x, top: treeMenu.y }}
             data-testid="folder-context-menu"
             role="menu"
             onClick={(e) => e.stopPropagation()}
@@ -137,7 +161,7 @@ function TreeNode({
               type="button"
               data-testid="create-folder-in-folder"
               onClick={() => {
-                setMenu(null);
+                setTreeMenu(null);
                 onCreateFolderInFolder(node.id);
               }}
             >
@@ -147,7 +171,7 @@ function TreeNode({
               type="button"
               data-testid="create-request-in-folder"
               onClick={() => {
-                setMenu(null);
+                setTreeMenu(null);
                 onCreateRequestInFolder(node.id);
               }}
             >
@@ -158,7 +182,7 @@ function TreeNode({
               type="button"
               data-testid="export-workspace"
               onClick={() => {
-                setMenu(null);
+                setTreeMenu(null);
                 void onExport();
               }}
             >
@@ -168,7 +192,7 @@ function TreeNode({
               type="button"
               data-testid="import-workspace"
               onClick={() => {
-                setMenu(null);
+                setTreeMenu(null);
                 void onImport();
               }}
             >
@@ -180,7 +204,7 @@ function TreeNode({
               className="danger"
               data-testid="delete-folder"
               onClick={() => {
-                setMenu(null);
+                setTreeMenu(null);
                 onDeleteFolder(node.id, node.name);
               }}
             >
@@ -193,6 +217,8 @@ function TreeNode({
             nodes={node.children}
             depth={depth + 1}
             activeId={activeId}
+            treeMenu={treeMenu}
+            setTreeMenu={setTreeMenu}
             onSelectRequest={onSelectRequest}
             onExport={onExport}
             onImport={onImport}
@@ -207,11 +233,15 @@ function TreeNode({
   }
 
   const active = activeId === node.id;
+  const showRequestMenu =
+    treeMenu?.kind === "request" && treeMenu.nodeId === node.id;
+
   return (
     <>
       <div
         className={`tree-row${active ? " active" : ""}`}
         style={{ paddingLeft: 8 + depth * 12 }}
+        data-tree-context
         onClick={() => onSelectRequest(node.id)}
         onContextMenu={onCtxRequest}
         data-testid={`request-${node.id}`}
@@ -220,10 +250,10 @@ function TreeNode({
         <span aria-hidden>▸</span>
         <span>{node.name}</span>
       </div>
-      {menu ? (
+      {showRequestMenu ? (
         <div
           className="context-menu"
-          style={{ left: menu.x, top: menu.y }}
+          style={{ left: treeMenu.x, top: treeMenu.y }}
           data-testid="request-context-menu"
           role="menu"
           onClick={(e) => e.stopPropagation()}
@@ -233,7 +263,7 @@ function TreeNode({
             className="danger"
             data-testid="delete-request"
             onClick={() => {
-              setMenu(null);
+              setTreeMenu(null);
               onDeleteRequest(node.id, node.name);
             }}
           >
