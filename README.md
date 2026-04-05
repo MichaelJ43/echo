@@ -117,6 +117,12 @@ That means **no PAT was found**. Add a **repository** secret (Settings → Secre
 
 Secrets added under **Environments** only apply if the workflow declares that `environment`; this repo uses **repository** secrets.
 
+### Troubleshooting: Version bump fails when starting Release (HTTP 401 / dispatch error)
+
+The job uses **`gh workflow run`** with **`GITHUB_TOKEN`**. If you see **401** or dispatch failures, open **Settings → Actions → General → Workflow permissions** and set **Workflow permissions** to **Read and write** (not *Read repository contents and packages permissions* only). The workflow requests `permissions: actions: write`; an **organization policy** can still block—check with an org admin.
+
+**Recovery:** If the version commit and tag already landed on `main`, run **Actions → Release → Run workflow** and enter that tag (e.g. `v0.1.7`).
+
 ## License
 
 MIT (add your preferred license).
