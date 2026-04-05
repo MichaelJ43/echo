@@ -180,7 +180,7 @@ function TreeNode({
                 onCreateFolderInFolder(node.id);
               }}
             >
-              Create folder…
+              Create folder
             </button>
             <button
               type="button"
@@ -190,7 +190,7 @@ function TreeNode({
                 onCreateRequestInFolder(node.id);
               }}
             >
-              Create request…
+              Create request
             </button>
             <div className="context-menu-sep" role="separator" />
             <button
@@ -211,7 +211,7 @@ function TreeNode({
                 void onImport();
               }}
             >
-              Import workspace…
+              Import workspace
             </button>
             <div className="context-menu-sep" role="separator" />
             <button
@@ -234,7 +234,7 @@ function TreeNode({
                 onDeleteFolder(node.id, node.name);
               }}
             >
-              Delete folder…
+              Delete folder
             </button>
           </div>
         ) : null}
@@ -295,7 +295,7 @@ function TreeNode({
               void onExportRequest(node.id, node.name);
             }}
           >
-            Export request…
+            Export request
           </button>
           <button
             type="button"
@@ -305,7 +305,7 @@ function TreeNode({
               onRenameRequest(node.id, node.name);
             }}
           >
-            Rename request…
+            Rename request
           </button>
           <div className="context-menu-sep" role="separator" />
           <button
@@ -317,7 +317,7 @@ function TreeNode({
               onDeleteRequest(node.id, node.name);
             }}
           >
-            Delete request…
+            Delete request
           </button>
         </div>
       ) : null}

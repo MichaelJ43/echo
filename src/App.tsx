@@ -958,7 +958,7 @@ export default function App() {
               void onExportWorkspace();
             }}
           >
-            Export workspace…
+            Export workspace
           </button>
           <div className="context-menu-sep" role="separator" />
           <button

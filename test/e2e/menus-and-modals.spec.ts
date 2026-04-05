@@ -24,7 +24,7 @@ test.describe("Sidebar Menu (meta menu)", () => {
     await expect(
       menu.getByRole("button", { name: "Manage local secrets" })
     ).toBeVisible();
-    await expect(menu.getByRole("button", { name: "Export workspace…" })).toBeVisible();
+    await expect(menu.getByRole("button", { name: "Export workspace" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "About Echo" })).toBeVisible();
   });
 
