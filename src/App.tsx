@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
+import type { Update } from "@tauri-apps/plugin-updater";
+import { isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   exportWorkspaceFile,
@@ -23,7 +26,14 @@ import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
 import type { AppState, HttpResponsePayload, RequestItem } from "./types";
 import { TreeNodes } from "./components/TreeNodes";
-import { startUpdateChecks } from "./lib/updater";
+import { UpdatePrompt } from "./components/UpdatePrompt";
+import {
+  fetchUpdateIfAvailable,
+  openGitHubReleasesPage,
+  recordSuppressUpdateNotificationsForever,
+  recordUpdatePromptDismissed,
+  startUpdateCheckScheduler,
+} from "./lib/updater";
 
 const METHODS = [
   "GET",
@@ -43,6 +53,13 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUpdateRef = useRef<Update | null>(null);
+  const [updateBanner, setUpdateBanner] = useState<{
+    currentVersion: string;
+    newVersion: string;
+  } | null>(null);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
+  const [metaMenu, setMetaMenu] = useState<{ x: number; y: number } | null>(null);
 
   const activeEnv = useMemo(() => {
     if (!state) return null;
@@ -51,8 +68,26 @@ export default function App() {
   }, [state]);
 
   useEffect(() => {
-    startUpdateChecks();
+    const scheduler = startUpdateCheckScheduler((u) => {
+      void pendingUpdateRef.current?.close().catch(() => {});
+      pendingUpdateRef.current = u;
+      setUpdateBanner({ currentVersion: u.currentVersion, newVersion: u.version });
+    });
+    return () => scheduler.dispose();
   }, []);
+
+  useEffect(() => {
+    if (!metaMenu) return;
+    const close = () => setMetaMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [metaMenu]);
+
+  useEffect(() => {
+    if (!infoToast || infoToast === "Checking for updates…") return;
+    const t = window.setTimeout(() => setInfoToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [infoToast]);
 
   useEffect(() => {
     void (async () => {
@@ -250,6 +285,60 @@ export default function App() {
     });
   }, []);
 
+  const onCollectionsContextMenu = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMetaMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const onCheckUpdatesManual = useCallback(async () => {
+    setMetaMenu(null);
+    if (!isTauri()) {
+      setInfoToast("Updates are only available in the desktop app.");
+      return;
+    }
+    setInfoToast("Checking for updates…");
+    try {
+      const u = await fetchUpdateIfAvailable();
+      if (u) {
+        void pendingUpdateRef.current?.close().catch(() => {});
+        pendingUpdateRef.current = u;
+        setUpdateBanner({ currentVersion: u.currentVersion, newVersion: u.version });
+        setInfoToast(null);
+      } else {
+        setInfoToast("You're up to date.");
+      }
+    } catch (e) {
+      setInfoToast(`Update check failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, []);
+
+  const onInstallUpdate = useCallback(async () => {
+    const u = pendingUpdateRef.current;
+    if (!u) return;
+    try {
+      await u.downloadAndInstall();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  const onDismissUpdate = useCallback(() => {
+    void pendingUpdateRef.current?.close().catch(() => {});
+    pendingUpdateRef.current = null;
+    recordUpdatePromptDismissed();
+    setUpdateBanner(null);
+  }, []);
+
+  const onSuppressUpdates = useCallback(() => {
+    void pendingUpdateRef.current?.close().catch(() => {});
+    pendingUpdateRef.current = null;
+    recordSuppressUpdateNotificationsForever();
+    setUpdateBanner(null);
+  }, []);
+
   if (!state) {
     return (
       <div className="request-panel">
@@ -263,7 +352,13 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar" data-testid="sidebar">
         <div className="sidebar-header">
-          <span>Collections</span>
+          <span
+            className="sidebar-title-label"
+            title="Right-click for more"
+            onContextMenu={onCollectionsContextMenu}
+          >
+            Collections
+          </span>
           <button
             type="button"
             className="sidebar-header-action"
@@ -569,6 +664,43 @@ export default function App() {
           ) : null}
         </div>
       </main>
+      {metaMenu ? (
+        <div
+          className="context-menu"
+          style={{ left: metaMenu.x, top: metaMenu.y }}
+          role="menu"
+          data-testid="sidebar-meta-menu"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button type="button" onClick={() => void onCheckUpdatesManual()}>
+            Check for updates
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMetaMenu(null);
+              openGitHubReleasesPage();
+            }}
+          >
+            View releases
+          </button>
+        </div>
+      ) : null}
+      {updateBanner ? (
+        <UpdatePrompt
+          currentVersion={updateBanner.currentVersion}
+          newVersion={updateBanner.newVersion}
+          onUpdate={() => void onInstallUpdate()}
+          onDismiss={onDismissUpdate}
+          onSuppressForever={onSuppressUpdates}
+          onViewRelease={openGitHubReleasesPage}
+        />
+      ) : null}
+      {infoToast ? (
+        <div className="update-toast" role="status" data-testid="update-info-toast">
+          {infoToast}
+        </div>
+      ) : null}
     </div>
   );
 }
