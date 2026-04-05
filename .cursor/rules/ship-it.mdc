@@ -1,0 +1,65 @@
+---
+description: When the user ends with "ship it" — branch from main, push, open PR, watch CI, fix failures
+alwaysApply: true
+---
+
+# Ship it (GitHub PR + CI)
+
+When the user’s **latest message ends with** `ship it` (case-insensitive; extra punctuation like `ship it!` is fine), or they explicitly ask to **ship** the current work to GitHub with a PR, run this **end-to-end** workflow. Respect `AGENTS.md` (tests, branch prefixes, no secrets).
+
+## Preconditions
+
+- **GitHub CLI** `gh` is available (`gh --version`). If missing, say so. If `gh auth status` fails, instruct: `gh auth login` (HTTPS or SSH) and retry after the user authenticates.
+- **Remote** `origin` exists and points at this repo on GitHub.
+
+## 1. Decide what to ship
+
+- If the **working tree is clean** and there is **nothing new** to commit for this task, **do not** open an empty PR; tell the user there is nothing to ship.
+- **Scope:** commit only files that belong to the work just completed (do not sweep unrelated changes). If unsure, `git status` / `git diff` and ask once.
+
+## 2. Branch from latest `origin/main`
+
+Prefer a **linear** flow so the PR targets current `main`:
+
+```bash
+git fetch origin
+git stash push -u -m "ship-it WIP"   # if checkout would fail due to local changes
+git checkout main
+git pull origin main
+git checkout -b <prefix>/<short-slug>   # e.g. feat/tree-folder-toggle — use feat/fix/chore/docs per AGENTS.md
+git stash pop                           # if you stashed; resolve conflicts if any
+```
+
+If you **already** have a sensible feature branch with the right commits only, you may **rebase onto** `origin/main` instead of a brand-new branch—**but** default to **new branch from updated `main`** when the session mixed multiple topics.
+
+## 3. Commit and push
+
+- **Run** `npm test` and `npm run build` before commit when the change touches app code (per `AGENTS.md`). Rust-only: `cargo test` in `src-tauri/` when relevant.
+- `git add` (scoped), `git commit -m "…"` with a clear imperative subject.
+- `git push -u origin HEAD`
+
+**Never** commit `src-tauri/*.key`, `.env`, or other ignored secrets.
+
+## 4. Open the PR
+
+```bash
+gh pr create --base main --head $(git branch --show-current) --title "<title>" --body "<description with Summary + Test plan or Changes>"
+```
+
+Paste the PR URL from the command output. If `gh pr create` fails, print the error and try `gh auth refresh` / login guidance.
+
+## 5. Poll CI until done
+
+- `gh pr checks --watch` **or** `gh pr view <n> --json statusCheckRollup,url` in a loop until state is no longer pending (poll every **20–30s** if `--watch` is unavailable).
+- **Conclusion = success:** Tell the user **checks passed** and give the **PR link** (`gh pr view --web` URL or the `html_url` from `gh pr view --json url`).
+
+## 6. If checks fail — investigate and retry
+
+- `gh run list --branch $(git branch --show-current) --limit 5` then `gh run view <id> --log-failed` (or open the Actions URL from the run).
+- **Fix** the minimal code/config, commit, push to the **same branch**, re-poll checks.
+- Repeat until green or you hit a **hard blocker** (missing org secret, fork permissions). Then explain what’s blocking and what the user must do.
+
+## Limits
+
+- Prefer **fewer than ~5** fix iterations before escalating with a summary of failing logs and next steps.
+- Do **not** merge the PR unless the user explicitly asks to merge.
