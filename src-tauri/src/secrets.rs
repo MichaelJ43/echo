@@ -9,17 +9,21 @@ use tauri::Manager;
 
 const KEYRING_SERVICE: &str = "echo/dev.echo.app/secrets";
 
+/// Allowed characters for `{{secret:NAME}}` — must stay in sync with `http_client` placeholder regex
+/// and `secretPlaceholders.ts`.
+fn is_valid_secret_name_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')
+}
+
 pub fn validate_secret_key(key: &str) -> Result<(), String> {
     if key.is_empty() {
         return Err("Secret name is required.".into());
     }
-    let mut it = key.chars();
-    let first = it.next().unwrap();
-    if !(first.is_ascii_alphabetic() || first == '_') {
-        return Err("Secret name must start with a letter or underscore.".into());
-    }
-    if !it.all(|c| c.is_ascii_alphanumeric() || c == '_') {
-        return Err("Secret name may only contain letters, digits, and underscores.".into());
+    if !key.chars().all(is_valid_secret_name_char) {
+        return Err(
+            "Secret name may only contain letters, digits, underscores, hyphens, and periods."
+                .into(),
+        );
     }
     Ok(())
 }
@@ -87,4 +91,22 @@ pub fn delete_secret(app: &AppHandle, key: String) -> Result<(), String> {
 
 pub fn list_secret_keys(app: &AppHandle) -> Result<Vec<String>, String> {
     load_secret_index(app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_secret_key;
+
+    #[test]
+    fn validate_accepts_hyphen_and_dot() {
+        validate_secret_key("api-key").expect("hyphen");
+        validate_secret_key("stripe.api_key").expect("dot");
+        validate_secret_key("v1").expect("starts with digit");
+    }
+
+    #[test]
+    fn validate_rejects_space_and_colon() {
+        assert!(validate_secret_key("a b").is_err());
+        assert!(validate_secret_key("a:b").is_err());
+    }
 }

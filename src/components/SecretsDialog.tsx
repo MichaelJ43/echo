@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteSecret, listSecretKeys, setSecret } from "../api";
 
 type Props = {
@@ -12,6 +12,8 @@ export function SecretsDialog({ open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
+  /** Only close when both press and release happen on the dimmed backdrop (not after text selection). */
+  const backdropPointerDownRef = useRef(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -64,13 +66,25 @@ export function SecretsDialog({ open, onClose }: Props) {
     <div
       className="secrets-dialog-backdrop"
       role="presentation"
-      onClick={onClose}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        backdropPointerDownRef.current = e.target === e.currentTarget;
+      }}
+      onMouseUp={(e) => {
+        if (
+          backdropPointerDownRef.current &&
+          e.button === 0 &&
+          e.target === e.currentTarget
+        ) {
+          onClose();
+        }
+        backdropPointerDownRef.current = false;
+      }}
     >
       <div
         className="secrets-dialog"
         role="dialog"
         aria-labelledby="secrets-dialog-title"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="secrets-dialog-header">
           <h2 id="secrets-dialog-title">Local secrets</h2>
@@ -94,7 +108,7 @@ export function SecretsDialog({ open, onClose }: Props) {
         <div className="secrets-add-row">
           <input
             type="text"
-            placeholder="NAME (e.g. api_token)"
+            placeholder="NAME (e.g. api_token, api-key)"
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
             autoComplete="off"

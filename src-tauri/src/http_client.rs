@@ -42,7 +42,7 @@ fn substitute(s: &str, vars: &HashMap<String, String>) -> String {
 fn secret_placeholder_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"\{\{secret:([a-zA-Z_][a-zA-Z0-9_]*)\}\}").expect("secret placeholder regex")
+        Regex::new(r"\{\{secret:([a-zA-Z0-9_.-]+)\}\}").expect("secret placeholder regex")
     })
 }
 

@@ -9,6 +9,12 @@ describe("textContainsSecretPlaceholder", () => {
     expect(textContainsSecretPlaceholder('Bearer {{secret:tok}}')).toBe(true);
   });
 
+  it("detects hyphenated secret names", () => {
+    expect(
+      textContainsSecretPlaceholder("Bearer {{secret:api-key}}")
+    ).toBe(true);
+  });
+
   it("does not match env-style {{name}}", () => {
     expect(textContainsSecretPlaceholder("{{host}}/x")).toBe(false);
   });

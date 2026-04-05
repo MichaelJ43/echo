@@ -1,9 +1,9 @@
 /**
  * `{{secret:NAME}}` is resolved only in the Tauri desktop HTTP path (OS keychain).
- * NAME: letter or underscore, then alphanumeric/underscore.
+ * NAME: letters, digits, `_`, `-`, `.` (must match Rust `validate_secret_key`).
  */
 export const SECRET_PLACEHOLDER_RE =
-  /\{\{secret:[a-zA-Z_][a-zA-Z0-9_]*\}\}/g;
+  /\{\{secret:[a-zA-Z0-9_.-]+\}\}/g;
 
 export function textContainsSecretPlaceholder(text: string): boolean {
   SECRET_PLACEHOLDER_RE.lastIndex = 0;
