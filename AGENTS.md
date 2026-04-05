@@ -20,9 +20,12 @@
 | `src/App.tsx` | Main UI: collection tree, request editor, response, environments. |
 | `src/api.ts` | Tauri `invoke` + `isTauri()`; browser fallbacks when not in the webview. |
 | `src-tauri/src/main.rs` | Rust binary entry; calls `echo_lib::run()`. |
-| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`** (open GitHub releases in the system browser). |
+| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`**, **`list_secret_keys` / `set_secret` / `delete_secret`** (OS keychain). |
 | `src/lib/updater.ts` | Desktop-only: `check` + `downloadAndInstall` + `relaunch`; scheduled on app load + hourly; **`openGitHubReleasesPage`** uses `invoke("open_external_url")` in Tauri (WebView `window.open` is unreliable). |
-| `src-tauri/src/http_client.rs` | `reqwest` request execution; variable substitution `{{name}}`. |
+| `src-tauri/src/http_client.rs` | `reqwest` request execution; env substitution `{{name}}`, then `{{secret:NAME}}` from keychain at send time; masks secret values in outbound error strings. |
+| `src-tauri/src/secrets.rs` | OS credential store (`keyring` crate) + `secret_index.json` (key names only, app data dir). |
+| `src/lib/secretPlaceholders.ts` | Detects `{{secret:…}}` in payloads (browser path rejects; desktop resolves in Rust only). |
+| `src/components/SecretsDialog.tsx` | Manage local secrets (Collections header context menu). |
 | `src-tauri/src/persistence.rs` | Workspace types, `collections.json` under app data dir. |
 
 **Dev (web only):** `npm run dev` → Vite on port **1420** (see `vite.config.ts`).
@@ -38,7 +41,7 @@
 ## 3. High-level data flow
 
 1. **UI state:** `AppState` (collections, environments, active request id) loaded via `load_state` / saved debounced via `save_state`.
-2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`).
+2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`). **`{{secret:NAME}}`** placeholders are **not** resolved in the UI; Rust loads values from the host keychain only when building the outbound request. Plain web build errors if secrets are present.
 3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`.
 4. **Import/export:** Dialog plugin + `import_workspace_file` / `export_workspace_file` (full workspace JSON).
 5. **Collections tree:** Root **+ Collection** adds a top-level folder. Folder context menu: create nested folder, create request (prompts for names), export/import workspace, delete folder (confirm). Request context menu: delete (confirm). Mutations use helpers in `src/lib/collection.ts` (`addChildToFolder`, `removeNodeById`, etc.) from `App.tsx` / `components/TreeNodes.tsx`.
@@ -51,20 +54,21 @@
 src/                      # React + TS UI, Vite client
   api.ts                  # Tauri invoke + browser fallbacks
   App.tsx, App.css        # Root layout
-  components/             # e.g. TreeNodes
-  lib/                    # variables, collection helpers, scriptRunner
+  components/             # TreeNodes, UpdatePrompt, SecretsDialog
+  lib/                    # variables, collection helpers, scriptRunner, secretPlaceholders
   types.ts
   *.test.ts(x)            # Vitest co-located tests
 src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   src/lib.rs, main.rs
-  src/http_client.rs, persistence.rs
+  src/http_client.rs, persistence.rs, secrets.rs
   tauri.conf.json, Cargo.toml, capabilities/, permissions/
   icons/                  # Generated via npm run icons (see README)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
 test/e2e/                 # Playwright (smoke / UI against dev server)
 scripts/                  # make-icon.mjs, bump-version.mjs, inject-updater-endpoint.mjs
 docs/                     # usage.md, architecture.md
-.github/workflows/        # ci.yml, release.yml (tauri-apps/tauri-action on v* tags), version-bump.yml
+.github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
+.github/codeql/             # codeql-config.yml (query filters for workflow-driven CodeQL)
 ```
 
 **Imports:** ESM (`"type": "module"`). No `@/` path alias unless added to `tsconfig` / Vite—prefer relative imports matching existing files.
@@ -135,6 +139,8 @@ Use this to classify changes in **this** app:
 | `npm run version:bump -- patch` | Bumps semver in `package.json`, `Cargo.toml`, `tauri.conf.json`, refreshes lockfiles (`scripts/bump-version.mjs`). |
 
 **CI:** `.github/workflows/ci.yml` — Node install, `npm test`, `npm run build`, and `cargo test` in `src-tauri/` when Rust is available on the runner.
+
+**Code scanning (GitHub CodeQL):** `.github/workflows/codeql.yml` runs advanced CodeQL with `config-file` → `.github/codeql/codeql-config.yml` (excludes `rust/cleartext-transmission` for this HTTP client). **You cannot use that workflow and GitHub’s default CodeQL setup at the same time** — SARIF upload fails with *“advanced configurations cannot be processed when the default setup is enabled.”* **Disable default CodeQL** for this repo: **Settings → Code security → Code scanning** → **CodeQL analysis** → turn off **default setup** (keep only the workflow). [Editing default setup](https://docs.github.com/en/code-security/code-scanning/managing-your-code-scanning-configuration/editing-your-configuration-of-default-setup).
 
 **Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, chooses **patch** / **minor** / **major** from **PR title** tokens **`+(semver:patch)`**, **`+(semver:minor)`**, **`+(semver:major)`** (case-insensitive; default **patch** if none); pushes to `main`, pushes `v*` tag, then **`gh workflow run`** with **`GH_TOKEN` = PAT** (`unset GITHUB_TOKEN` for that invocation) so **Release** dispatches; **`GITHUB_TOKEN` alone often 401s** `workflow_dispatch`. **Fine-grained PAT** needs **Actions: Read and write** for dispatch, not only **Contents**. **workflow_dispatch** bumps **patch**, **minor**, or **major** by input. **Requires** **`RELEASE_PUSH_TOKEN`** or **`GH_PAT`** for git push and dispatch.
 

@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { createDefaultState } from "./defaultState";
+import { payloadContainsSecretPlaceholder } from "./lib/secretPlaceholders";
 import type { AppState, AuthConfig, HttpResponsePayload, KeyValue } from "./types";
 
 const LS_KEY = "echo.workspace.v1";
@@ -142,8 +143,27 @@ export async function saveState(state: AppState): Promise<void> {
 export async function sendHttpRequest(
   payload: SendRequestPayload
 ): Promise<HttpResponsePayload> {
-  if (!isTauri()) return sendHttpRequestBrowser(payload);
+  if (!isTauri()) {
+    if (payloadContainsSecretPlaceholder(payload)) {
+      throw new Error(
+        "Local secrets ({{secret:NAME}}) are only available in the desktop app."
+      );
+    }
+    return sendHttpRequestBrowser(payload);
+  }
   return invoke<HttpResponsePayload>("send_http_request", { config: payload });
+}
+
+export async function listSecretKeys(): Promise<string[]> {
+  return invoke<string[]>("list_secret_keys");
+}
+
+export async function setSecret(key: string, value: string): Promise<void> {
+  await invoke("set_secret", { key, value });
+}
+
+export async function deleteSecret(key: string): Promise<void> {
+  await invoke("delete_secret", { key });
 }
 
 export async function importWorkspaceFile(path: string): Promise<AppState> {

@@ -25,6 +25,7 @@ import {
 import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
 import type { AppState, HttpResponsePayload, RequestItem } from "./types";
+import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeNodes } from "./components/TreeNodes";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import {
@@ -60,6 +61,7 @@ export default function App() {
   } | null>(null);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [metaMenu, setMetaMenu] = useState<{ x: number; y: number } | null>(null);
+  const [secretsOpen, setSecretsOpen] = useState(false);
 
   const activeEnv = useMemo(() => {
     if (!state) return null;
@@ -684,8 +686,22 @@ export default function App() {
           >
             View releases
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMetaMenu(null);
+              if (!isTauri()) {
+                setInfoToast("Local secrets are only available in the desktop app.");
+                return;
+              }
+              setSecretsOpen(true);
+            }}
+          >
+            Manage local secrets…
+          </button>
         </div>
       ) : null}
+      <SecretsDialog open={secretsOpen} onClose={() => setSecretsOpen(false)} />
       {updateBanner ? (
         <UpdatePrompt
           currentVersion={updateBanner.currentVersion}

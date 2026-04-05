@@ -1,6 +1,9 @@
 use crate::persistence::{AuthConfig, KeyValue};
+use crate::secrets;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::Instant;
 use url::Url;
 
@@ -36,31 +39,111 @@ fn substitute(s: &str, vars: &HashMap<String, String>) -> String {
     out
 }
 
-fn append_query(url: &mut Url, query: &[KeyValue], vars: &HashMap<String, String>) {
+fn secret_placeholder_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"\{\{secret:([a-zA-Z_][a-zA-Z0-9_]*)\}\}").expect("secret placeholder regex")
+    })
+}
+
+/// Replaces `{{secret:NAME}}` with keychain values; collects substituted values for log masking.
+fn apply_secret_placeholders(s: &str) -> Result<(String, Vec<String>), String> {
+    let re = secret_placeholder_regex();
+    let mut out = s.to_string();
+    let mut acc = Vec::new();
+    loop {
+        let Some(cap) = re.captures(&out) else {
+            break;
+        };
+        let name = cap.get(1).unwrap().as_str();
+        let full = cap.get(0).unwrap().as_str();
+        let val = secrets::get_secret(name)?;
+        acc.push(val.clone());
+        out = out.replacen(full, &val, 1);
+    }
+    Ok((out, acc))
+}
+
+fn substitute_env_and_secrets(
+    s: &str,
+    vars: &HashMap<String, String>,
+) -> Result<(String, Vec<String>), String> {
+    let after_env = substitute(s, vars);
+    apply_secret_placeholders(&after_env)
+}
+
+fn merge_secret_vecs(mask_acc: &mut Vec<String>, mut extra: Vec<String>) {
+    mask_acc.append(&mut extra);
+}
+
+pub(crate) fn mask_for_log(s: &str, secrets: &[String]) -> String {
+    let uniq: std::collections::HashSet<String> = secrets.iter().cloned().collect();
+    let mut ordered: Vec<String> = uniq.into_iter().collect();
+    ordered.sort_by_key(|a| std::cmp::Reverse(a.len()));
+    let mut out = s.to_string();
+    for sec in ordered {
+        if sec.is_empty() {
+            continue;
+        }
+        out = out.replace(&sec, "*****");
+    }
+    out
+}
+
+fn append_query(
+    url: &mut Url,
+    query: &[KeyValue],
+    vars: &HashMap<String, String>,
+    mask_acc: &mut Vec<String>,
+) -> Result<(), String> {
     for q in query {
         if !q.enabled || q.key.is_empty() {
             continue;
         }
-        let k = substitute(&q.key, vars);
-        let v = substitute(&q.value, vars);
+        let (k, sec_k) = substitute_env_and_secrets(&q.key, vars)?;
+        let (v, sec_v) = substitute_env_and_secrets(&q.value, vars)?;
+        merge_secret_vecs(mask_acc, sec_k);
+        merge_secret_vecs(mask_acc, sec_v);
         url.query_pairs_mut().append_pair(&k, &v);
     }
+    Ok(())
 }
 
-fn build_base_url(raw: &str, query: &[KeyValue], vars: &HashMap<String, String>) -> Result<Url, String> {
-    let resolved = substitute(raw, vars);
-    let mut url = Url::parse(&resolved).map_err(|e| format!("Invalid URL: {e}"))?;
-    append_query(&mut url, query, vars);
+fn build_base_url(
+    raw: &str,
+    query: &[KeyValue],
+    vars: &HashMap<String, String>,
+    mask_acc: &mut Vec<String>,
+) -> Result<Url, String> {
+    let (resolved, sec) = substitute_env_and_secrets(raw, vars)?;
+    merge_secret_vecs(mask_acc, sec);
+    let mut url = Url::parse(&resolved).map_err(|e| {
+        format!(
+            "Invalid URL: {e} ({})",
+            mask_for_log(&resolved, mask_acc)
+        )
+    })?;
+    append_query(&mut url, query, vars, mask_acc)?;
     Ok(url)
 }
 
+/// Sends the configured HTTP request via `reqwest` (TLS for `https://` URLs).
+/// CodeQL `rust/cleartext-transmission` is a false positive for this HTTP client; suppression
+/// is configured in `.github/codeql/codeql-config.yml` and applied via `.github/workflows/codeql.yml`.
 pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePayload, String> {
+    let mut mask_acc: Vec<String> = Vec::new();
+
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| mask_for_log(&e.to_string(), &mask_acc))?;
 
-    let mut url = build_base_url(&config.url, &config.query_params, &config.variables)?;
+    let mut url = build_base_url(
+        &config.url,
+        &config.query_params,
+        &config.variables,
+        &mut mask_acc,
+    )?;
 
     if let AuthConfig::ApiKey {
         key,
@@ -69,14 +152,16 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     } = &config.auth
     {
         if add_to == "query" {
-            let k = substitute(key, &config.variables);
-            let v = substitute(value, &config.variables);
+            let (k, sec_k) = substitute_env_and_secrets(key, &config.variables)?;
+            let (v, sec_v) = substitute_env_and_secrets(value, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec_k);
+            merge_secret_vecs(&mut mask_acc, sec_v);
             url.query_pairs_mut().append_pair(&k, &v);
         }
     }
 
     let method = reqwest::Method::from_bytes(config.method.as_bytes())
-        .map_err(|e| format!("Invalid method: {e}"))?;
+        .map_err(|e| mask_for_log(&format!("Invalid method: {e}"), &mask_acc))?;
 
     let mut req = client.request(method, url);
 
@@ -84,20 +169,25 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
         if !h.enabled || h.key.is_empty() {
             continue;
         }
-        let name = substitute(&h.key, &config.variables);
-        let value = substitute(&h.value, &config.variables);
+        let (name, sec_n) = substitute_env_and_secrets(&h.key, &config.variables)?;
+        let (value, sec_v) = substitute_env_and_secrets(&h.value, &config.variables)?;
+        merge_secret_vecs(&mut mask_acc, sec_n);
+        merge_secret_vecs(&mut mask_acc, sec_v);
         req = req.header(name, value);
     }
 
     match &config.auth {
         AuthConfig::None => {}
         AuthConfig::Bearer { token } => {
-            let t = substitute(token, &config.variables);
+            let (t, sec) = substitute_env_and_secrets(token, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec);
             req = req.bearer_auth(t);
         }
         AuthConfig::Basic { username, password } => {
-            let u = substitute(username, &config.variables);
-            let p = substitute(password, &config.variables);
+            let (u, sec_u) = substitute_env_and_secrets(username, &config.variables)?;
+            let (p, sec_p) = substitute_env_and_secrets(password, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec_u);
+            merge_secret_vecs(&mut mask_acc, sec_p);
             req = req.basic_auth(u, Some(p));
         }
         AuthConfig::ApiKey {
@@ -106,8 +196,10 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
             add_to,
         } => {
             if add_to == "header" {
-                let k = substitute(key, &config.variables);
-                let v = substitute(value, &config.variables);
+                let (k, sec_k) = substitute_env_and_secrets(key, &config.variables)?;
+                let (v, sec_v) = substitute_env_and_secrets(value, &config.variables)?;
+                merge_secret_vecs(&mut mask_acc, sec_k);
+                merge_secret_vecs(&mut mask_acc, sec_v);
                 req = req.header(k, v);
             }
         }
@@ -115,7 +207,8 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
 
     req = match config.body_type.as_str() {
         "json" | "raw" if !config.body.is_empty() => {
-            let b = substitute(&config.body, &config.variables);
+            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec);
             if config.body_type == "json" {
                 req.header(
                     reqwest::header::CONTENT_TYPE,
@@ -127,7 +220,8 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
             }
         }
         "form" if !config.body.is_empty() => {
-            let b = substitute(&config.body, &config.variables);
+            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec);
             req.header(
                 reqwest::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded; charset=utf-8",
@@ -138,7 +232,10 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     };
 
     let start = Instant::now();
-    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| mask_for_log(&e.to_string(), &mask_acc))?;
     let duration_ms = start.elapsed().as_millis() as u64;
 
     let status = resp.status().as_u16();
@@ -155,7 +252,10 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
         }
     }
 
-    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| mask_for_log(&e.to_string(), &mask_acc))?;
 
     Ok(HttpResponsePayload {
         status,
@@ -188,7 +288,17 @@ mod tests {
             value: "1".to_string(),
             enabled: true,
         }];
-        let u = build_base_url("https://httpbin.org/get", &q, &HashMap::new()).unwrap();
+        let mut acc = Vec::new();
+        let u = build_base_url("https://httpbin.org/get", &q, &HashMap::new(), &mut acc).unwrap();
         assert!(u.as_str().contains("a=1"));
+    }
+
+    #[test]
+    fn mask_for_log_replaces_longest_first() {
+        let s = "tok2 and tok22";
+        let masked = mask_for_log(s, &["tok22".into(), "tok2".into()]);
+        assert!(!masked.contains("tok22"));
+        assert!(!masked.contains("tok2"));
+        assert!(masked.contains("*****"));
     }
 }

@@ -1,0 +1,8 @@
+# Echo is an HTTP client: reqwest sends HTTPS traffic with TLS when the URL uses
+# https://. CodeQL rust/cleartext-transmission flags secret/token substitution
+# flowing into req.send() as "cleartext" without modeling transport encryption.
+# Outbound error strings are masked in Rust (mask_for_log).
+name: "Echo CodeQL"
+query-filters:
+  - exclude:
+      id: rust/cleartext-transmission
