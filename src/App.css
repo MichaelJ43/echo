@@ -45,10 +45,30 @@ body,
 }
 
 .sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.sidebar-header-action {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sidebar-header-action:hover {
+  background: rgba(88, 166, 255, 0.2);
 }
 
 .tree {
@@ -235,6 +255,22 @@ textarea.body-input {
 
 .context-menu button:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu button.danger {
+  color: var(--danger);
+}
+
+.context-menu button.danger:hover {
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.context-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+  border: none;
+  padding: 0;
 }
 
 .path-hint {

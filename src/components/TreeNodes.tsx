@@ -8,6 +8,10 @@ type Props = {
   onSelectRequest: (id: string) => void;
   onExport: () => void | Promise<void>;
   onImport: () => void | Promise<void>;
+  onCreateFolderInFolder: (parentFolderId: string) => void;
+  onCreateRequestInFolder: (parentFolderId: string) => void;
+  onDeleteFolder: (folderId: string, folderName: string) => void;
+  onDeleteRequest: (requestId: string, requestName: string) => void;
 };
 
 export function TreeNodes({
@@ -17,6 +21,10 @@ export function TreeNodes({
   onSelectRequest,
   onExport,
   onImport,
+  onCreateFolderInFolder,
+  onCreateRequestInFolder,
+  onDeleteFolder,
+  onDeleteRequest,
 }: Props) {
   return (
     <>
@@ -29,6 +37,10 @@ export function TreeNodes({
           onSelectRequest={onSelectRequest}
           onExport={onExport}
           onImport={onImport}
+          onCreateFolderInFolder={onCreateFolderInFolder}
+          onCreateRequestInFolder={onCreateRequestInFolder}
+          onDeleteFolder={onDeleteFolder}
+          onDeleteRequest={onDeleteRequest}
         />
       ))}
     </>
@@ -42,6 +54,10 @@ function TreeNode({
   onSelectRequest,
   onExport,
   onImport,
+  onCreateFolderInFolder,
+  onCreateRequestInFolder,
+  onDeleteFolder,
+  onDeleteRequest,
 }: {
   node: CollectionNode;
   depth: number;
@@ -49,6 +65,10 @@ function TreeNode({
   onSelectRequest: (id: string) => void;
   onExport: () => void | Promise<void>;
   onImport: () => void | Promise<void>;
+  onCreateFolderInFolder: (parentFolderId: string) => void;
+  onCreateRequestInFolder: (parentFolderId: string) => void;
+  onDeleteFolder: (folderId: string, folderName: string) => void;
+  onDeleteRequest: (requestId: string, requestName: string) => void;
 }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -59,10 +79,20 @@ function TreeNode({
     return () => window.removeEventListener("click", close);
   }, [menu]);
 
-  const onCtx = useCallback(
+  const onCtxFolder = useCallback(
     (e: MouseEvent) => {
       if (node.nodeType !== "folder") return;
       e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY });
+    },
+    [node]
+  );
+
+  const onCtxRequest = useCallback(
+    (e: MouseEvent) => {
+      if (node.nodeType !== "request") return;
+      e.preventDefault();
+      e.stopPropagation();
       setMenu({ x: e.clientX, y: e.clientY });
     },
     [node]
@@ -74,7 +104,7 @@ function TreeNode({
         <div
           className="tree-row"
           style={{ paddingLeft: 8 + depth * 12 }}
-          onContextMenu={onCtx}
+          onContextMenu={onCtxFolder}
           data-testid={`folder-${node.id}`}
         >
           <span aria-hidden>📁</span>
@@ -88,6 +118,27 @@ function TreeNode({
             role="menu"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              type="button"
+              data-testid="create-folder-in-folder"
+              onClick={() => {
+                setMenu(null);
+                onCreateFolderInFolder(node.id);
+              }}
+            >
+              Create folder…
+            </button>
+            <button
+              type="button"
+              data-testid="create-request-in-folder"
+              onClick={() => {
+                setMenu(null);
+                onCreateRequestInFolder(node.id);
+              }}
+            >
+              Create request…
+            </button>
+            <div className="context-menu-sep" role="separator" />
             <button
               type="button"
               data-testid="export-workspace"
@@ -108,6 +159,18 @@ function TreeNode({
             >
               Import workspace…
             </button>
+            <div className="context-menu-sep" role="separator" />
+            <button
+              type="button"
+              className="danger"
+              data-testid="delete-folder"
+              onClick={() => {
+                setMenu(null);
+                onDeleteFolder(node.id, node.name);
+              }}
+            >
+              Delete folder…
+            </button>
           </div>
         ) : null}
         <TreeNodes
@@ -117,6 +180,10 @@ function TreeNode({
           onSelectRequest={onSelectRequest}
           onExport={onExport}
           onImport={onImport}
+          onCreateFolderInFolder={onCreateFolderInFolder}
+          onCreateRequestInFolder={onCreateRequestInFolder}
+          onDeleteFolder={onDeleteFolder}
+          onDeleteRequest={onDeleteRequest}
         />
       </div>
     );
@@ -124,15 +191,39 @@ function TreeNode({
 
   const active = activeId === node.id;
   return (
-    <div
-      className={`tree-row${active ? " active" : ""}`}
-      style={{ paddingLeft: 8 + depth * 12 }}
-      onClick={() => onSelectRequest(node.id)}
-      data-testid={`request-${node.id}`}
-    >
-      <span className="tree-indent" aria-hidden />
-      <span aria-hidden>▸</span>
-      <span>{node.name}</span>
-    </div>
+    <>
+      <div
+        className={`tree-row${active ? " active" : ""}`}
+        style={{ paddingLeft: 8 + depth * 12 }}
+        onClick={() => onSelectRequest(node.id)}
+        onContextMenu={onCtxRequest}
+        data-testid={`request-${node.id}`}
+      >
+        <span className="tree-indent" aria-hidden />
+        <span aria-hidden>▸</span>
+        <span>{node.name}</span>
+      </div>
+      {menu ? (
+        <div
+          className="context-menu"
+          style={{ left: menu.x, top: menu.y }}
+          data-testid="request-context-menu"
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="danger"
+            data-testid="delete-request"
+            onClick={() => {
+              setMenu(null);
+              onDeleteRequest(node.id, node.name);
+            }}
+          >
+            Delete request…
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }

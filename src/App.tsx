@@ -8,7 +8,17 @@ import {
   saveState,
   sendHttpRequest,
 } from "./api";
-import { findRequest, firstRequestId, mapCollection } from "./lib/collection";
+import {
+  addChildToFolder,
+  appendRootFolder,
+  createFolderNode,
+  createRequestItem,
+  findRequest,
+  firstRequestId,
+  mapCollection,
+  removeNodeById,
+  requestToNode,
+} from "./lib/collection";
 import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
 import type { AppState, HttpResponsePayload, RequestItem } from "./types";
@@ -153,6 +163,93 @@ export default function App() {
     setState(next);
   }, []);
 
+  const onCreateRootFolder = useCallback(() => {
+    const name = window.prompt("Collection name", "New collection");
+    if (name === null) return;
+    const trimmed = name.trim() || "New collection";
+    setState((prev) => {
+      if (!prev) return prev;
+      const folder = createFolderNode(trimmed);
+      return {
+        ...prev,
+        collections: appendRootFolder(prev.collections, folder),
+      };
+    });
+  }, []);
+
+  const onCreateFolderInFolder = useCallback((parentId: string) => {
+    const name = window.prompt("Folder name", "New folder");
+    if (name === null) return;
+    const trimmed = name.trim() || "New folder";
+    setState((prev) => {
+      if (!prev) return prev;
+      const child = createFolderNode(trimmed);
+      return {
+        ...prev,
+        collections: addChildToFolder(prev.collections, parentId, child),
+      };
+    });
+  }, []);
+
+  const onCreateRequestInFolder = useCallback((parentId: string) => {
+    const name = window.prompt("Request name", "New request");
+    if (name === null) return;
+    const trimmed = name.trim() || "New request";
+    const req = createRequestItem(trimmed);
+    const node = requestToNode(req);
+    setState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        collections: addChildToFolder(prev.collections, parentId, node),
+        activeRequestId: req.id,
+      };
+    });
+  }, []);
+
+  const onDeleteFolder = useCallback((folderId: string, folderName: string) => {
+    if (
+      !window.confirm(
+        `Delete folder "${folderName}" and everything inside it?`
+      )
+    ) {
+      return;
+    }
+    setState((prev) => {
+      if (!prev) return prev;
+      const nextCollections = removeNodeById(prev.collections, folderId);
+      let nextActive = prev.activeRequestId;
+      if (
+        nextActive &&
+        findRequest(nextCollections, nextActive) === null
+      ) {
+        nextActive = firstRequestId(nextCollections);
+      }
+      return {
+        ...prev,
+        collections: nextCollections,
+        activeRequestId: nextActive,
+      };
+    });
+  }, []);
+
+  const onDeleteRequest = useCallback((requestId: string, requestName: string) => {
+    if (!window.confirm(`Delete request "${requestName}"?`)) return;
+    setState((prev) => {
+      if (!prev) return prev;
+      const nextCollections = removeNodeById(prev.collections, requestId);
+      let nextActive = prev.activeRequestId;
+      if (prev.activeRequestId === requestId) {
+        nextActive = firstRequestId(nextCollections);
+      }
+      return {
+        ...prev,
+        collections: nextCollections,
+        activeRequestId: nextActive,
+      };
+    });
+  }, []);
+
   if (!state) {
     return (
       <div className="request-panel">
@@ -165,7 +262,18 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar" data-testid="sidebar">
-        <div className="sidebar-header">Collections</div>
+        <div className="sidebar-header">
+          <span>Collections</span>
+          <button
+            type="button"
+            className="sidebar-header-action"
+            title="New collection (root folder)"
+            data-testid="create-root-collection"
+            onClick={() => onCreateRootFolder()}
+          >
+            + Collection
+          </button>
+        </div>
         <div className="tree">
           <TreeNodes
             nodes={state.collections}
@@ -175,6 +283,10 @@ export default function App() {
             }
             onExport={onExport}
             onImport={onImport}
+            onCreateFolderInFolder={onCreateFolderInFolder}
+            onCreateRequestInFolder={onCreateRequestInFolder}
+            onDeleteFolder={onDeleteFolder}
+            onDeleteRequest={onDeleteRequest}
           />
         </div>
         {paths ? (
