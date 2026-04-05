@@ -139,6 +139,8 @@ Use this to classify changes in **this** app:
 
 **CI:** `.github/workflows/ci.yml` — Node install, `npm test`, `npm run build`, and `cargo test` in `src-tauri/` when Rust is available on the runner.
 
+**Code scanning (GitHub CodeQL):** `.github/codeql/codeql-config.yml` — excludes `rust/cleartext-transmission` for this repo (HTTP client; HTTPS is TLS; query does not model transport encryption).
+
 **Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, chooses **patch** / **minor** / **major** from **PR title** tokens **`+(semver:patch)`**, **`+(semver:minor)`**, **`+(semver:major)`** (case-insensitive; default **patch** if none); pushes to `main`, pushes `v*` tag, then **`gh workflow run`** with **`GH_TOKEN` = PAT** (`unset GITHUB_TOKEN` for that invocation) so **Release** dispatches; **`GITHUB_TOKEN` alone often 401s** `workflow_dispatch`. **Fine-grained PAT** needs **Actions: Read and write** for dispatch, not only **Contents**. **workflow_dispatch** bumps **patch**, **minor**, or **major** by input. **Requires** **`RELEASE_PUSH_TOKEN`** or **`GH_PAT`** for git push and dispatch.
 
 **Release:** `.github/workflows/release.yml` — **`workflow_dispatch` only** (invoked by Version bump or manually). Matrix-build with `tauri-apps/tauri-action` (installers + `latest.json`). **Concurrency** is set on the **workflow** (not each matrix job) so all three OS jobs run in parallel; job-level `concurrency` with a tag-only group cancels the third matrix leg. Requires `TAURI_SIGNING_PRIVATE_KEY`. **Manual:** Actions → Release → **Run workflow** → tag (e.g. `v0.1.4`). **Do not** put `[skip ci]` on the release bump commit — it can skip workflows tied to that commit message.
