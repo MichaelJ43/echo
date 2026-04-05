@@ -1,0 +1,68 @@
+name: Bug report
+description: Something is broken or incorrect in Echo
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please include enough detail to reproduce it.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong in one or two sentences?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a clean or typical state if relevant.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Desktop (Tauri) — Windows
+        - Desktop (Tauri) — macOS
+        - Desktop (Tauri) — Linux
+        - Web dev only (`npm run dev`, no Tauri)
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Echo version (if known)
+      description: App **About** dialog or GitHub Releases.
+      placeholder: e.g. 0.4.10
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, workspace/import quirks, logs, or related issues.

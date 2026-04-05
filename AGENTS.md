@@ -71,7 +71,11 @@ test/e2e/                 # Playwright (smoke / UI against dev server)
 scripts/                  # make-icon.mjs, crop-logo-to-square.py, compose-social-preview.py, run-compose-social.mjs, requirements-images.txt, bump-version.mjs, inject-updater-endpoint.mjs
 docs/                     # usage.md, architecture.md, contributors.md, logo-source.png, github-social-preview.png (generated), github-social-preview-template.png (optional ref export from compose script)
 .github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
+.github/ISSUE_TEMPLATE/     # bug_report.yml, feature_request.yml, config.yml (GitHub issue forms)
+.github/pull_request_template.md  # default PR body scaffold
 .github/codeql/             # codeql-config.yml (query filters for workflow-driven CodeQL)
+CODE_OF_CONDUCT.md          # Contributor Covenant (community standards)
+CONTRIBUTING.md             # entry point → docs/contributors.md, security, CoC
 ```
 
 **Imports:** ESM (`"type": "module"`). No `@/` path alias unless added to `tsconfig` / Vite—prefer relative imports matching existing files.

@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an idea or improvement for Echo
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share what you’d like Echo to do and why it matters for your workflow.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to accomplish? What’s painful or missing today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution (optional)
+      description: How you imagine it could work in the UI or behaviorally.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional)
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area (best guess)
+      options:
+        - Collections / tree
+        - Requests (method, URL, body, send)
+        - Environments / variables
+        - Auth / secrets
+        - Scripts / completion
+        - Import / export
+        - Desktop / Tauri / updater
+        - Documentation
+        - Other
+    validations:
+      required: true

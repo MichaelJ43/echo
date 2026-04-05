@@ -35,7 +35,9 @@ More detail: **[docs/usage.md](docs/usage.md)**.
 
 ## Contributing
 
-If you want to **build features or fix bugs**, see **[docs/contributors.md](docs/contributors.md)**.
+Start with **[CONTRIBUTING.md](CONTRIBUTING.md)**. The project follows the **[Code of Conduct](CODE_OF_CONDUCT.md)**.
+
+For detailed developer workflow, see **[docs/contributors.md](docs/contributors.md)**.
 
 ## License
 
