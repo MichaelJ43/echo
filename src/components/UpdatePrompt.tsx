@@ -4,7 +4,7 @@ type Props = {
   onUpdate: () => void;
   onDismiss: () => void;
   onSuppressForever: () => void;
-  onViewRelease: () => void;
+  onViewRelease: () => void | Promise<void>;
 };
 
 export function UpdatePrompt({
@@ -31,7 +31,11 @@ export function UpdatePrompt({
         </div>
         <p id="update-prompt-desc" className="update-prompt-desc">
           Echo <strong>{newVersion}</strong> is available (you have {currentVersion}).{" "}
-          <button type="button" className="update-prompt-link" onClick={onViewRelease}>
+          <button
+            type="button"
+            className="update-prompt-link"
+            onClick={() => void Promise.resolve(onViewRelease())}
+          >
             View on GitHub
           </button>
         </p>
