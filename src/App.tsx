@@ -848,11 +848,16 @@ export default function App() {
           data-testid="sidebar-meta-menu"
           onClick={(e) => e.stopPropagation()}
         >
-          <button type="button" onClick={() => void onCheckUpdatesManual()}>
+          <button
+            type="button"
+            data-testid="meta-menu-check-updates"
+            onClick={() => void onCheckUpdatesManual()}
+          >
             Check for updates
           </button>
           <button
             type="button"
+            data-testid="meta-menu-view-releases"
             onClick={() => {
               setMetaMenu(null);
               void openGitHubReleasesPage();
@@ -862,6 +867,7 @@ export default function App() {
           </button>
           <button
             type="button"
+            data-testid="meta-menu-secrets"
             onClick={() => {
               setMetaMenu(null);
               if (!isTauri()) {
@@ -876,6 +882,7 @@ export default function App() {
           <div className="context-menu-sep" role="separator" />
           <button
             type="button"
+            data-testid="meta-menu-about"
             onClick={() => {
               setMetaMenu(null);
               setAboutOpen(true);

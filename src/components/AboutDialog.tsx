@@ -16,6 +16,7 @@ export function AboutDialog({ open, onClose }: Props) {
   return (
     <div
       className="secrets-dialog-backdrop"
+      data-testid="about-dialog-backdrop"
       role="presentation"
       onMouseDown={(e) => {
         if (e.button !== 0) return;
@@ -34,6 +35,7 @@ export function AboutDialog({ open, onClose }: Props) {
     >
       <div
         className="about-dialog"
+        data-testid="about-dialog"
         role="dialog"
         aria-labelledby="about-dialog-title"
         aria-describedby="about-dialog-desc"
@@ -43,6 +45,7 @@ export function AboutDialog({ open, onClose }: Props) {
           <button
             type="button"
             className="secrets-dialog-close"
+            data-testid="about-dialog-close"
             aria-label="Close"
             onClick={onClose}
           >
