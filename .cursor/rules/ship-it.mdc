@@ -1,65 +1,77 @@
 ---
-description: When the user ends with "ship it" — branch from main, push, open PR, watch CI, fix failures
+description: When the user ends with "ship it" — SemVer bump, branch, PR, watch CI
 alwaysApply: true
 ---
 
 # Ship it (GitHub PR + CI)
 
-When the user’s **latest message ends with** `ship it` (case-insensitive; extra punctuation like `ship it!` is fine), or they explicitly ask to **ship** the current work to GitHub with a PR, run this **end-to-end** workflow. Respect `AGENTS.md` (tests, branch prefixes, no secrets).
+When the user’s **latest message ends with** `ship it` (case-insensitive; `ship it!` is fine), or they explicitly ask to **ship** the current work to GitHub with a PR, run this **end-to-end** workflow.
 
 ## Preconditions
 
-- **GitHub CLI** `gh` is available (`gh --version`). If missing, say so. If `gh auth status` fails, instruct: `gh auth login` (HTTPS or SSH) and retry after the user authenticates.
+- **Read** `AGENTS.md` **§5b (Semantic versioning)** and **§6 (Version bump)** before shipping—do not skip SemVer classification.
+- **GitHub CLI** `gh` is available (`gh --version`). If `gh auth status` fails, instruct `gh auth login`.
 - **Remote** `origin` exists and points at this repo on GitHub.
+
+## 0. SemVer classification (required)
+
+Use **[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)** (official spec) and **`AGENTS.md` §5b** (Echo public API mapping).
+
+1. **Inspect** the change: `git diff` / `git diff --stat` (and the task context). Classify **one** recommended bump using the [SemVer 2.0.0 spec](https://semver.org/spec/v2.0.0.html) and **`AGENTS.md` §5b**:
+   - **PATCH** — backward-compatible **bug fixes** only (fixes incorrect behavior).
+   - **MINOR** — **new backward-compatible functionality** to the public API, **deprecation** of public API, or (per spec) substantial private improvements.
+   - **MAJOR** — **backward-incompatible** public API changes.
+
+2. **Echo-specific** “public API” is defined in **`AGENTS.md` §5b** (IPC, workspace JSON, observable client behavior, updater config). When unsure, prefer **patch** for docs-only / non-behavioral churn.
+
+3. **PR body must include** a section like:
+
+```markdown
+## Semver
+
+- **Recommended bump:** patch | minor | major
+- **Rationale:** (2–4 bullets tying the diff to SemVer criteria and §5b)
+```
+
+4. **CI alignment:** Merging to `main` triggers **Version bump** with **patch** only. If the recommended bump is **minor** or **major**, state in the PR that **after merge** the maintainer should run **Actions → Version bump → Run workflow** and select **minor** or **major** (see `AGENTS.md` §5b / §6). Do **not** claim the automated merge path will bump minor/major.
 
 ## 1. Decide what to ship
 
-- If the **working tree is clean** and there is **nothing new** to commit for this task, **do not** open an empty PR; tell the user there is nothing to ship.
-- **Scope:** commit only files that belong to the work just completed (do not sweep unrelated changes). If unsure, `git status` / `git diff` and ask once.
+- If the **working tree is clean** and there is **nothing new** to commit, **do not** open an empty PR.
+- **Scope:** commit only files for this task; use `git status` / `git diff` if unsure.
 
 ## 2. Branch from latest `origin/main`
 
-Prefer a **linear** flow so the PR targets current `main`:
-
 ```bash
 git fetch origin
-git stash push -u -m "ship-it WIP"   # if checkout would fail due to local changes
+git stash push -u -m "ship-it WIP"   # if needed
 git checkout main
 git pull origin main
-git checkout -b <prefix>/<short-slug>   # e.g. feat/tree-folder-toggle — use feat/fix/chore/docs per AGENTS.md
-git stash pop                           # if you stashed; resolve conflicts if any
+git checkout -b <prefix>/<short-slug>   # feat/ fix/ chore/ docs/ — align with change type and §5b bump
+git stash pop
 ```
-
-If you **already** have a sensible feature branch with the right commits only, you may **rebase onto** `origin/main` instead of a brand-new branch—**but** default to **new branch from updated `main`** when the session mixed multiple topics.
 
 ## 3. Commit and push
 
-- **Run** `npm test` and `npm run build` before commit when the change touches app code (per `AGENTS.md`). Rust-only: `cargo test` in `src-tauri/` when relevant.
-- `git add` (scoped), `git commit -m "…"` with a clear imperative subject.
-- `git push -u origin HEAD`
-
-**Never** commit `src-tauri/*.key`, `.env`, or other ignored secrets.
+- **Run** `npm test` and `npm run build` when app code changes; `cargo test` in `src-tauri/` when Rust changes (per `AGENTS.md`).
+- `git add` (scoped), `git commit -m "…"`, `git push -u origin HEAD`
+- **Never** commit `src-tauri/*.key`, `.env`, or ignored secrets.
 
 ## 4. Open the PR
 
 ```bash
-gh pr create --base main --head $(git branch --show-current) --title "<title>" --body "<description with Summary + Test plan or Changes>"
+gh pr create --base main --head $(git branch --show-current) --title "<title>" --body "<body including ## Semver section>"
 ```
 
-Paste the PR URL from the command output. If `gh pr create` fails, print the error and try `gh auth refresh` / login guidance.
+## 5. Poll CI
 
-## 5. Poll CI until done
+- `gh pr checks --watch` (or poll until complete).
+- **Success:** give the **PR URL** and restate **recommended semver bump** + post-merge note if **minor**/**major**.
 
-- `gh pr checks --watch` **or** `gh pr view <n> --json statusCheckRollup,url` in a loop until state is no longer pending (poll every **20–30s** if `--watch` is unavailable).
-- **Conclusion = success:** Tell the user **checks passed** and give the **PR link** (`gh pr view --web` URL or the `html_url` from `gh pr view --json url`).
+## 6. If checks fail
 
-## 6. If checks fail — investigate and retry
-
-- `gh run list --branch $(git branch --show-current) --limit 5` then `gh run view <id> --log-failed` (or open the Actions URL from the run).
-- **Fix** the minimal code/config, commit, push to the **same branch**, re-poll checks.
-- Repeat until green or you hit a **hard blocker** (missing org secret, fork permissions). Then explain what’s blocking and what the user must do.
+- `gh run view <id> --log-failed`; fix; push; re-check. Cap ~5 iterations; then summarize blockers.
 
 ## Limits
 
-- Prefer **fewer than ~5** fix iterations before escalating with a summary of failing logs and next steps.
-- Do **not** merge the PR unless the user explicitly asks to merge.
+- Do **not** merge unless the user explicitly asks.

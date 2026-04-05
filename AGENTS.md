@@ -85,6 +85,42 @@ docs/                     # usage.md, architecture.md
 
 ---
 
+## 5b. Semantic versioning (SemVer 2.0.0)
+
+This repo follows **[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)**. The normative rules below match the official spec ([Summary](https://semver.org/spec/v2.0.0.html#summary) and the **Patch / Minor / Major** paragraphs under *Semantic Versioning Specification*); use them to decide **patch** vs **minor** vs **major** when shipping. Deprecation workflow is described in the [FAQ](https://semver.org/) (“How should I handle deprecating functionality?”).
+
+### Official increment rules (spec)
+
+Given a version **MAJOR.MINOR.PATCH** ([spec summary](https://semver.org/spec/v2.0.0.html#summary)):
+
+| Bump | When (normative — see [SemVer 2.0.0 spec](https://semver.org/spec/v2.0.0.html) paragraphs on patch / minor / major) |
+|------|------------------|
+| **PATCH** | **Z** in `x.y.Z` (`x > 0`): increment only if **backward compatible bug fixes** are introduced. A **bug fix** is an internal change that fixes **incorrect** behavior. |
+| **MINOR** | **Y** in `x.Y.z` (`x > 0`): increment if **new, backward compatible functionality** is introduced to the **public API**; **MUST** increment if any public API is **deprecated**; **MAY** increment for substantial new functionality in **private** code; **MAY** include patch-level changes; **patch MUST reset to 0** when minor increments. |
+| **MAJOR** | **X** in `X.y.z` (`X > 0`): increment if **backward incompatible** changes are introduced to the **public API**; **MAY** include minor and patch changes; **minor and patch MUST reset to 0** when major increments. |
+
+**Public API** (spec): software **MUST** declare a public API (code and/or documentation); it **SHOULD** be precise.
+
+**Version 0.y.z:** initial development—anything **MAY** change; the public API **SHOULD NOT** be considered stable. The SemVer [FAQ](https://semver.org/) suggests incrementing **minor** for each subsequent **0.y.z** release in early development—**this repo’s CI** still defaults to **patch** on merge to `main`; use **manual** Version bump (**minor** / **major**) when the change set matches those segments (see **Version bump** below).
+
+### Echo “public API” (for semver judgment)
+
+Use this to classify changes in **this** app:
+
+- **Tauri IPC:** `#[tauri::command]` names, payload shapes, and behavior of `invoke` from `src/api.ts` ↔ Rust.
+- **Workspace / persistence:** JSON shape written for collections/environments (`persistence.rs` / `types.ts`) and import/export compatibility.
+- **Observable behavior:** HTTP client semantics from the UI (methods, auth, variables, scripts) where users rely on stable behavior.
+- **Release / updater:** `tauri.conf.json` updater URL and signing expectations for installed apps.
+
+**Docs-only** or **internal refactors** with no user-visible behavior change: usually **patch** (or **minor** only if the spec’s “substantial private code” clause applies—use judgment).
+
+### Ship it + CI
+
+- **`ship it` (Cursor rule):** classify the change as **patch**, **minor**, or **major** using the table above; put **Recommended semver bump** and a short rationale in the **PR body** (see `.cursor/rules/ship-it.mdc`).
+- **Automation:** `.github/workflows/version-bump.yml` bumps **patch** when a PR merges to `main`. If the PR warrants **minor** or **major**, after merge run **Actions → Version bump → Run workflow** and choose **minor** or **major** (or **patch** to align with the recommendation).
+
+---
+
 ## 6. Linting, typecheck, tests, CI
 
 | Command | What it does |
@@ -119,7 +155,7 @@ docs/                     # usage.md, architecture.md
 
 ## 8. How to make changes (checklist)
 
-1. **Branch** from `main` with a clear prefix (`feat/`, `fix/`, `chore/`, `docs/`) and open a **pull request** for merges that should go through review and CI.
+1. **Branch** from `main` with a clear prefix (`feat/`, `fix/`, `chore/`, `docs/`) and open a **pull request** for merges that should go through review and CI. When using **ship it**, classify **patch / minor / major** per **§5b** and put **Recommended bump** + rationale in the PR body.
 2. **Locate** the right layer: UI (`src/`), HTTP/persistence (`src-tauri/src/`), config (`tauri.conf.json`, `Cargo.toml`).
 3. **Implement** with minimal scope; keep browser + Tauri paths in `api.ts` coherent when touching requests or storage.
 4. **Run** `npm test` and `npm run build`; for native changes, `cargo test` / `npm run tauri build` locally when possible.
@@ -131,5 +167,5 @@ docs/                     # usage.md, architecture.md
 ## 9. Meta
 
 - **Single onboarding file:** New agents should read **this file first**, then `README.md` / `docs/usage.md`, then targeted source files.
-- **Cursor:** `.cursor/rules/agents-md-first.mdc` (`alwaysApply: true`) instructs reading this file before substantive work and commands. `.cursor/rules/ship-it.mdc` defines the **ship it** flow: branch from `main`, push, `gh pr create`, watch checks, fix failures.
+- **Cursor:** `.cursor/rules/agents-md-first.mdc` (`alwaysApply: true`) instructs reading this file before substantive work and commands. `.cursor/rules/ship-it.mdc` defines the **ship it** flow: **SemVer classification** (§5b), branch from `main`, push, `gh pr create` (body includes recommended bump), watch checks, fix failures.
 - **Stale content:** If this file drifts from the repo, update it—stale `AGENTS.md` is a bug.
