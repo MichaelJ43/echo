@@ -103,7 +103,17 @@ The app checks for updates **on launch** and **every hour** while running (deskt
 
 **Release workflow** (`.github/workflows/release.yml`) runs on **`v*` tags**, builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. It requires **`TAURI_SIGNING_PRIVATE_KEY`**. Automated releases also require **`RELEASE_PUSH_TOKEN`** on the **Version bump** workflow (see above).
 
-**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT so tag pushes trigger Release).
+**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT so tag pushes trigger Release; optional alias **`GH_PAT`**).
+
+### Troubleshooting: Version bump failed on “Use PAT for git push”
+
+That means **no PAT was found**. Add a **repository** secret (Settings → Secrets and variables → **Actions** → **New repository secret**):
+
+1. Name: **`RELEASE_PUSH_TOKEN`** (exact), or **`GH_PAT`** as a fallback name.
+2. Value: a [fine-grained PAT](https://github.com/settings/tokens?type=beta) with access to **this repo** and **Contents: Read and write** (or a classic PAT with **`repo`** scope).
+3. Save, then **re-run** the failed workflow (**Re-run all jobs**) or **Actions** → **Version bump** → **Run workflow**.
+
+Secrets added under **Environments** only apply if the workflow declares that `environment`; this repo uses **repository** secrets.
 
 ## License
 
