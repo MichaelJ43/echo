@@ -73,7 +73,8 @@ docs/                     # usage.md, architecture.md
 
 - **Tauri:** `src-tauri/tauri.conf.json` — app id `dev.echo.app`, window, bundle (`createUpdaterArtifacts`), `beforeDevCommand` / `frontendDist`, `plugins.updater` (pubkey + endpoints; GitHub `latest.json` URL).
 - **Rust:** `src-tauri/Cargo.toml` — crate name `echo`, dependencies for `tauri`, `reqwest`, `tauri-plugin-updater`, `tauri-plugin-process`, etc.
-- **Secrets:** No API keys in repo; user data lives in app data. **Release signing:** `TAURI_SIGNING_PRIVATE_KEY` in GitHub Actions only (never commit the private key file). Respect `.cursorignore` for `.env*`.
+- **Secrets:** No API keys in repo; user data lives in app data. **Release signing:** `TAURI_SIGNING_PRIVATE_KEY` in GitHub Actions only (never commit the private key file). The **public** updater key in `tauri.conf.json` is **not** a secret (embedded for signature verification). Respect `.cursorignore` for `.env*`.
+- **Git workflow:** Work on branches such as `feat/…`, `fix/…`, `chore/…`, `docs/…` and open PRs into `main`; avoid pushing secrets or `src-tauri/*.key`.
 - **Icons:** `npm run icons` generates `logo.png` and refreshes `src-tauri/icons/` (see `scripts/make-icon.mjs`).
 
 ---
@@ -112,11 +113,12 @@ docs/                     # usage.md, architecture.md
 
 ## 8. How to make changes (checklist)
 
-1. **Locate** the right layer: UI (`src/`), HTTP/persistence (`src-tauri/src/`), config (`tauri.conf.json`, `Cargo.toml`).
-2. **Implement** with minimal scope; keep browser + Tauri paths in `api.ts` coherent when touching requests or storage.
-3. **Run** `npm test` and `npm run build`; for native changes, `cargo test` / `npm run tauri build` locally when possible.
-4. **Update** `AGENTS.md` if you changed architecture, scripts, CI, or structural rules.
-5. **Do not** commit secrets or stray `.env` files ignored by git.
+1. **Branch** from `main` with a clear prefix (`feat/`, `fix/`, `chore/`, `docs/`) and open a **pull request** for merges that should go through review and CI.
+2. **Locate** the right layer: UI (`src/`), HTTP/persistence (`src-tauri/src/`), config (`tauri.conf.json`, `Cargo.toml`).
+3. **Implement** with minimal scope; keep browser + Tauri paths in `api.ts` coherent when touching requests or storage.
+4. **Run** `npm test` and `npm run build`; for native changes, `cargo test` / `npm run tauri build` locally when possible.
+5. **Update** `AGENTS.md` if you changed architecture, scripts, CI, or structural rules.
+6. **Do not** commit secrets, `src-tauri/*.key` private keys, or stray `.env` files ignored by git.
 
 ---
 
