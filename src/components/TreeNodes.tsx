@@ -71,6 +71,8 @@ function TreeNode({
   onDeleteRequest: (requestId: string, requestName: string) => void;
 }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  /** Only used when node is a folder; request rows ignore this state. */
+  const [expanded, setExpanded] = useState(true);
 
   useEffect(() => {
     if (!menu) return;
@@ -102,11 +104,24 @@ function TreeNode({
     return (
       <div>
         <div
-          className="tree-row"
+          className="tree-row tree-row-folder"
           style={{ paddingLeft: 8 + depth * 12 }}
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setExpanded((v) => !v);
+            }
+          }}
           onContextMenu={onCtxFolder}
           data-testid={`folder-${node.id}`}
         >
+          <span className="tree-chevron" aria-hidden>
+            {expanded ? "▼" : "▶"}
+          </span>
           <span aria-hidden>📁</span>
           <span>{node.name}</span>
         </div>
@@ -173,18 +188,20 @@ function TreeNode({
             </button>
           </div>
         ) : null}
-        <TreeNodes
-          nodes={node.children}
-          depth={depth + 1}
-          activeId={activeId}
-          onSelectRequest={onSelectRequest}
-          onExport={onExport}
-          onImport={onImport}
-          onCreateFolderInFolder={onCreateFolderInFolder}
-          onCreateRequestInFolder={onCreateRequestInFolder}
-          onDeleteFolder={onDeleteFolder}
-          onDeleteRequest={onDeleteRequest}
-        />
+        {expanded ? (
+          <TreeNodes
+            nodes={node.children}
+            depth={depth + 1}
+            activeId={activeId}
+            onSelectRequest={onSelectRequest}
+            onExport={onExport}
+            onImport={onImport}
+            onCreateFolderInFolder={onCreateFolderInFolder}
+            onCreateRequestInFolder={onCreateRequestInFolder}
+            onDeleteFolder={onDeleteFolder}
+            onDeleteRequest={onDeleteRequest}
+          />
+        ) : null}
       </div>
     );
   }
