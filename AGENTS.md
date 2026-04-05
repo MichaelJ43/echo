@@ -101,7 +101,7 @@ docs/                     # usage.md, architecture.md
 
 **Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, bumps **patch** and pushes a `v*` tag (`[skip ci]` on the version commit). **workflow_dispatch** bumps **patch**, **minor**, or **major** manually.
 
-**Release:** `.github/workflows/release.yml` — on **`v*` tag** push, matrix-builds with `tauri-apps/tauri-action` (uploads installers + `latest.json` for the updater). Requires `TAURI_SIGNING_PRIVATE_KEY` secret.
+**Release:** `.github/workflows/release.yml` — on **`v*` tag** push, matrix-builds with `tauri-apps/tauri-action` (uploads installers + `latest.json` for the updater). Requires `TAURI_SIGNING_PRIVATE_KEY` secret. **Manual retry:** Actions → Release → **Run workflow** → enter an **existing** tag (e.g. `v0.1.2`) if a tag push failed to upload assets. **Do not** put `[skip ci]` on the commit that the release tag points at — GitHub skips those workflows, including tag-triggered Release (see `version-bump.yml`).
 
 **Rust tests:** `cd src-tauri && cargo test` (unit tests in `http_client.rs`, etc.).
 
