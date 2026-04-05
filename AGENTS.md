@@ -60,6 +60,7 @@ src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   src/http_client.rs, persistence.rs
   tauri.conf.json, Cargo.toml, capabilities/
   icons/                  # Generated via npm run icons (see README)
+  windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
 test/e2e/                 # Playwright (smoke / UI against dev server)
 scripts/                  # make-icon.mjs, bump-version.mjs, inject-updater-endpoint.mjs
 docs/                     # usage.md, architecture.md
