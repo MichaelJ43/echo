@@ -11,14 +11,19 @@ on:
         required: true
         type: string
 
+# One workflow run per tag at a time (avoids overlapping duplicate dispatches).
+# Do NOT put concurrency on the matrix job with a tag-only group: each matrix leg
+# would share that group, and GitHub only allows one running + one pending job per
+# group — the third OS job is cancelled with "higher priority waiting request".
+concurrency:
+  group: release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
   publish:
-    concurrency:
-      group: release-${{ github.event.inputs.tag }}
-      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
