@@ -12,6 +12,10 @@
 
 **Echo** is a free, cross-platform **desktop app for exploring and testing HTTP APIs**—send requests, organize them in collections, switch environments, and inspect responses. It is a lightweight alternative to tools like Postman or Insomnia, with a dark, focused UI.
 
+<p align="center">
+  <img src="docs/screenshot-main.png" alt="Echo: collections sidebar, request editor (GET to httpbin), environment, auth, query, headers, body, completion script, and response area" width="920" />
+</p>
+
 ## Download
 
 Installers and auto-updates are published on **[GitHub Releases](https://github.com/MichaelJ43/echo/releases)** for **Windows**, **macOS**, and **Linux**. The desktop app checks for updates on its own; you can also open the releases page from the app when an update is available.
