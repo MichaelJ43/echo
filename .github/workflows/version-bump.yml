@@ -73,8 +73,8 @@ jobs:
 
       - name: Commit and tag
         env:
-          # Explicit token: bare ${GITHUB_TOKEN} in bash was empty here → curl 401 to workflow dispatch API.
-          GITHUB_TOKEN: ${{ github.token }}
+          PAT: ${{ secrets.RELEASE_PUSH_TOKEN }}
+          PAT_ALT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -92,4 +92,12 @@ jobs:
           git tag "v${VERSION}"
           git push origin "refs/tags/v${VERSION}"
           echo "Dispatching Release workflow for v${VERSION}..."
-          gh workflow run release.yml --ref main -f tag="v${VERSION}" -R "${GITHUB_REPOSITORY}"
+          # GITHUB_TOKEN often 401s workflow_dispatch from Actions; gh prefers GITHUB_TOKEN over GH_TOKEN.
+          # Use the same PAT as git push and drop GITHUB_TOKEN for this invocation.
+          DISPATCH_TOKEN="${PAT:-$PAT_ALT}"
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "::error::Missing RELEASE_PUSH_TOKEN / GH_PAT — required to dispatch Release (not only for git push)."
+            exit 1
+          fi
+          env -u GITHUB_TOKEN GH_TOKEN="$DISPATCH_TOKEN" gh workflow run release.yml \
+            --ref main -f tag="v${VERSION}" -R "${GITHUB_REPOSITORY}"

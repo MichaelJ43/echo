@@ -80,7 +80,7 @@ The app version is defined in `package.json`, `src-tauri/tauri.conf.json`, and `
 
 ### GitHub Actions: semver and releases
 
-- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits, pushes to `main`, pushes a `v*` tag, then **starts the Release workflow** via the API (`workflow_dispatch`). **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used for `git push` only (the default Actions token cannot push to `main` in this flow). **Tag push alone does not reliably start other workflows** from automation; the bump job explicitly dispatches Release.
+- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits, pushes to `main`, pushes a `v*` tag, then **starts the Release workflow** via **`gh workflow run`** (same PAT as push; see below). **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used for **`git push`** and **dispatching** Release (the default Actions token cannot push to `main`, and **`GITHUB_TOKEN` often 401s** workflow dispatch). **Tag push alone does not reliably start other workflows** from automation; the bump job explicitly dispatches Release.
 - **Manual minor or major:** In GitHub → **Actions** → **Version bump** → **Run workflow**, choose **minor** or **major**. The same bump → commit → tag flow runs with your selected segment.
 - **Local bump (any segment):** `npm run version:bump -- patch` (or `minor` / `major`).
 
@@ -101,9 +101,9 @@ The app checks for updates **on launch** and **every hour** while running (deskt
    - `src-tauri/*.key` and `src-tauri/*.key.pub` are **gitignored** so the generated files are not committed; the tracked copy of the public key is **`tauri.conf.json` only**.
 2. **Updater URL:** The default endpoint uses this repository. For forks, change the GitHub URL in `tauri.conf.json`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds when `GITHUB_REPOSITORY` is set.
 
-**Release workflow** (`.github/workflows/release.yml`) is **workflow_dispatch** only: it runs when **Version bump** dispatches it after a successful bump, or when you **Run workflow** manually and enter a tag (e.g. `v0.1.4`). It builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. Requires **`TAURI_SIGNING_PRIVATE_KEY`**. **`RELEASE_PUSH_TOKEN`** is for **Version bump** pushes, not for Release itself.
+**Release workflow** (`.github/workflows/release.yml`) is **workflow_dispatch** only: it runs when **Version bump** dispatches it after a successful bump, or when you **Run workflow** manually and enter a tag (e.g. `v0.1.4`). It builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. Requires **`TAURI_SIGNING_PRIVATE_KEY`**. **`RELEASE_PUSH_TOKEN`** is used by **Version bump** for **git push** and **`gh workflow run`** (not by the Release job itself for auth).
 
-**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT for Version bump git push; optional alias **`GH_PAT`**).
+**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT: git push + dispatch Release; optional alias **`GH_PAT`**; fine-grained needs **Actions: Read and write**).
 
 **Tag exists but no GitHub Release / no installers:** open **Actions** → **Release** → **Run workflow** → type the tag (e.g. `v0.1.4`) → Run. That builds and attaches assets to a Release for that tag.
 
@@ -112,14 +112,17 @@ The app checks for updates **on launch** and **every hour** while running (deskt
 That means **no PAT was found**. Add a **repository** secret (Settings → Secrets and variables → **Actions** → **New repository secret**):
 
 1. Name: **`RELEASE_PUSH_TOKEN`** (exact), or **`GH_PAT`** as a fallback name.
-2. Value: a [fine-grained PAT](https://github.com/settings/tokens?type=beta) with access to **this repo** and **Contents: Read and write** (or a classic PAT with **`repo`** scope).
+2. Value: a [fine-grained PAT](https://github.com/settings/tokens?type=beta) with access to **this repo**, **Contents: Read and write**, and **Actions: Read and write** (needed for `gh workflow run` / Release dispatch). Or a classic PAT with **`repo`** scope.
 3. Save, then **re-run** the failed workflow (**Re-run all jobs**) or **Actions** → **Version bump** → **Run workflow**.
 
 Secrets added under **Environments** only apply if the workflow declares that `environment`; this repo uses **repository** secrets.
 
 ### Troubleshooting: Version bump fails when starting Release (HTTP 401 / dispatch error)
 
-The job uses **`gh workflow run`** with **`GITHUB_TOKEN`**. If you see **401** or dispatch failures, open **Settings → Actions → General → Workflow permissions** and set **Workflow permissions** to **Read and write** (not *Read repository contents and packages permissions* only). The workflow requests `permissions: actions: write`; an **organization policy** can still block—check with an org admin.
+Release is started with **`gh workflow run`** using the **same PAT** as git push (`RELEASE_PUSH_TOKEN` / `GH_PAT`), not `GITHUB_TOKEN` (that token often returns **401** for `workflow_dispatch` inside Actions).
+
+1. **Fine-grained PAT:** add repository permission **Actions → Read and write** (not only Contents). Regenerate the token if you change permissions, then update the repo secret.
+2. **Repo default token:** **Settings → Actions → General → Workflow permissions** can stay **Read and write**; org policy may still block.
 
 **Recovery:** If the version commit and tag already landed on `main`, run **Actions → Release → Run workflow** and enter that tag (e.g. `v0.1.7`).
 
