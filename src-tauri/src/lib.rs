@@ -1,0 +1,89 @@
+mod http_client;
+mod persistence;
+
+use persistence::{export_to_path, import_from_path, load_workspace, save_workspace, AppState};
+use serde::Serialize;
+use std::path::Path;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppPaths {
+    app_data_dir: String,
+    collections_file: String,
+}
+
+#[tauri::command]
+fn get_paths(app: tauri::AppHandle) -> Result<AppPaths, String> {
+    let dir = persistence::app_data_dir(&app)?;
+    let collections = dir.join("collections.json");
+    Ok(AppPaths {
+        app_data_dir: dir.to_string_lossy().into_owned(),
+        collections_file: collections.to_string_lossy().into_owned(),
+    })
+}
+
+#[tauri::command]
+fn load_state(app: tauri::AppHandle) -> Result<AppState, String> {
+    load_workspace(&app)
+}
+
+#[tauri::command]
+fn save_state(app: tauri::AppHandle, state: AppState) -> Result<(), String> {
+    save_workspace(&app, &state)
+}
+
+#[tauri::command]
+async fn send_http_request(
+    config: http_client::HttpRequestConfig,
+) -> Result<http_client::HttpResponsePayload, String> {
+    http_client::send_request(config).await
+}
+
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(Path::new(&path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(Path::new(&path), contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_workspace_file(path: String) -> Result<AppState, String> {
+    import_from_path(Path::new(&path))
+}
+
+#[tauri::command]
+fn export_workspace_file(path: String, state: AppState) -> Result<(), String> {
+    export_to_path(Path::new(&path), &state)
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .invoke_handler(tauri::generate_handler![
+            get_paths,
+            load_state,
+            save_state,
+            send_http_request,
+            read_text_file,
+            write_text_file,
+            import_workspace_file,
+            export_workspace_file
+        ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = persistence::ensure_workspace(&handle) {
+                    eprintln!("echo: workspace init: {e}");
+                }
+            });
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running Echo");
+}

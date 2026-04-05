@@ -1,0 +1,26 @@
+Guidelines:
+I want this to be a git enabled project
+This is a new project, all source code should be under ./src and all test code should be under ./test
+This should be a compiled application that can be launched as an executable, should have a windows, mac, and linux versions, create an installer that sets up necessary locations to store settings
+All supporting files should either be at the root or under appropriately named directories (ie. ./docs)
+I want comprehensive documentation, both on what the application does and how to use it
+I want Well written code that is maintainable and follows best practices
+I want Well written and comprehensive unit tests
+I want UI based tests
+I want Component tests that verify the application as a whole
+The language it is written in is not important, but I want it to be as fast as possible, so choose a language using that as a main criteria
+
+Process for Completing this:
+Phase 1: Plan the project
+Phase 2: Follow through on the plan, be sure to handle unit tests by following TDD
+Phase 3: Verify, run unit tests, run component tests, run any UI based tests
+Phase 4: Compile supplemental documentation and instructions
+Phase 5: Create the release pipeline, including versioning, test, and compile/release process, keep in mind the various platforms to support
+
+Project Details:
+This will be an alternate to Postman, it is meant to be able to make calls of various type to endpoints, it should have a similar featureset to Postman.
+It needs to make endpoint requests of all of the potential types: put, post, get, etc.
+It should support variables, query strings, authentication, scripts on completion, etc
+It should have a straightforward UI, with a folder-type structure on a left panel showing which call is "active".  Main block of the application will be the call and details.  Below the main block will be the response of the call.
+Since the info will be saved (should save in common location for installed applications for mac/windows/linux versions), ie windows uses Users/<user>/AppData
+In the right click menu for the folder-collections on the left panel I should be able to click export or import and select a location for the newly created file or the location for the file to import

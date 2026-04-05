@@ -1,0 +1,73 @@
+name: Version bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver segment to increase"
+        type: choice
+        required: true
+        default: minor
+        options:
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: npm install
+
+      - name: Choose bump kind
+        id: kind
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "bump=${{ inputs.bump }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version in package.json, Cargo.toml, tauri.conf.json, lockfiles
+        run: node scripts/bump-version.mjs "${{ steps.kind.outputs.bump }}"
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+          if [ -f src-tauri/Cargo.lock ]; then git add src-tauri/Cargo.lock; fi
+          if git diff --staged --quiet; then
+            echo "No version change; exiting."
+            exit 0
+          fi
+          VERSION=$(node -p "require('./package.json').version")
+          git commit -m "chore: release v${VERSION} [skip ci]"
+          git push origin main
+          git tag "v${VERSION}"
+          git push origin "refs/tags/v${VERSION}"
