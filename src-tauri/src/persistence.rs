@@ -43,6 +43,8 @@ pub enum AuthConfig {
 pub struct RequestItem {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub environment_id: Option<String>,
     pub method: String,
     pub url: String,
     pub headers: Vec<KeyValue>,
@@ -75,6 +77,7 @@ pub enum CollectionNode {
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
     pub version: u32,
+    #[serde(default)]
     pub active_environment_id: Option<String>,
     pub environments: Vec<Environment>,
     pub collections: Vec<CollectionNode>,
@@ -83,11 +86,13 @@ pub struct AppState {
 
 impl Default for AppState {
     fn default() -> Self {
+        let env_id = Uuid::new_v4().to_string();
+        let req_id = Uuid::new_v4().to_string();
         Self {
             version: 1,
             active_environment_id: None,
             environments: vec![Environment {
-                id: Uuid::new_v4().to_string(),
+                id: env_id.clone(),
                 name: "Default".to_string(),
                 variables: vec![],
             }],
@@ -96,8 +101,9 @@ impl Default for AppState {
                 name: "My collection".to_string(),
                 children: vec![CollectionNode::Request {
                     request: RequestItem {
-                        id: Uuid::new_v4().to_string(),
+                        id: req_id,
                         name: "Example GET".to_string(),
+                        environment_id: Some(env_id),
                         method: "GET".to_string(),
                         url: "https://httpbin.org/get".to_string(),
                         headers: vec![],

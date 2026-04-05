@@ -22,6 +22,7 @@ const sample: CollectionNode[] = [
         nodeType: "request",
         id: "r1",
         name: "A",
+        environmentId: "e0",
         method: "GET",
         url: "https://example.com",
         headers: [],
@@ -79,7 +80,7 @@ describe("collection helpers", () => {
   });
 
   it("creates request node union", () => {
-    const r = createRequestItem("X");
+    const r = createRequestItem("X", "env1");
     const n = requestToNode(r);
     expect(n.nodeType).toBe("request");
     if (n.nodeType === "request") expect(n.name).toBe("X");

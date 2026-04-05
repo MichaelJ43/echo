@@ -19,12 +19,13 @@ import {
   findRequest,
   firstRequestId,
   mapCollection,
+  mapEveryRequest,
   removeNodeById,
   requestToNode,
 } from "./lib/collection";
 import { runCompletionScript } from "./lib/scriptRunner";
 import { variablesToMap } from "./lib/variables";
-import type { AppState, HttpResponsePayload, RequestItem } from "./types";
+import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
 import { AboutDialog } from "./components/AboutDialog";
 import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeNodes, type TreeMenuState } from "./components/TreeNodes";
@@ -67,12 +68,6 @@ export default function App() {
   );
   const [secretsOpen, setSecretsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-
-  const activeEnv = useMemo(() => {
-    if (!state) return null;
-    const id = state.activeEnvironmentId ?? state.environments[0]?.id;
-    return state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null;
-  }, [state]);
 
   useEffect(() => {
     const scheduler = startUpdateCheckScheduler((u) => {
@@ -152,6 +147,14 @@ export default function App() {
     if (!state?.activeRequestId) return null;
     return findRequest(state.collections, state.activeRequestId);
   }, [state]);
+
+  const activeEnv = useMemo(() => {
+    if (!state || !activeRequest) return null;
+    const id = activeRequest.environmentId;
+    return (
+      state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null
+    );
+  }, [state, activeRequest]);
 
   const updateActiveRequest = useCallback(
     (fn: (r: RequestItem) => RequestItem) => {
@@ -259,10 +262,12 @@ export default function App() {
     const name = window.prompt("Request name", "New request");
     if (name === null) return;
     const trimmed = name.trim() || "New request";
-    const req = createRequestItem(trimmed);
-    const node = requestToNode(req);
     setState((prev) => {
       if (!prev) return prev;
+      const envId = prev.environments[0]?.id;
+      if (!envId) return prev;
+      const req = createRequestItem(trimmed, envId);
+      const node = requestToNode(req);
       return {
         ...prev,
         collections: addChildToFolder(prev.collections, parentId, node),
@@ -337,6 +342,74 @@ export default function App() {
     if (v) setMetaMenu(null);
     setTreeContextMenu(v);
   }, []);
+
+  const onAddEnvironment = useCallback(() => {
+    const name = window.prompt("Environment name", "New environment");
+    if (name === null) return;
+    const id = crypto.randomUUID();
+    const trimmed = name.trim() || "New environment";
+    setState((s) => {
+      if (!s) return s;
+      return {
+        ...s,
+        environments: [...s.environments, { id, name: trimmed, variables: [] }],
+      };
+    });
+    updateActiveRequest((r) => ({ ...r, environmentId: id }));
+  }, [updateActiveRequest]);
+
+  const onRenameEnvironment = useCallback(() => {
+    if (!activeEnv) return;
+    const name = window.prompt("Environment name", activeEnv.name);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setState((s) => {
+      if (!s) return s;
+      return {
+        ...s,
+        environments: s.environments.map((e) =>
+          e.id === activeEnv.id ? { ...e, name: trimmed } : e
+        ),
+      };
+    });
+  }, [activeEnv]);
+
+  const onDuplicateEnvironment = useCallback(() => {
+    if (!activeEnv) return;
+    const id = crypto.randomUUID();
+    const copy: Environment = {
+      id,
+      name: `${activeEnv.name} copy`,
+      variables: activeEnv.variables.map((v) => ({ ...v })),
+    };
+    setState((s) => (s ? { ...s, environments: [...s.environments, copy] } : s));
+    updateActiveRequest((r) => ({ ...r, environmentId: id }));
+  }, [activeEnv, updateActiveRequest]);
+
+  const onDeleteEnvironment = useCallback(() => {
+    if (!state || !activeEnv) return;
+    if (state.environments.length <= 1) {
+      window.alert("You need at least one environment.");
+      return;
+    }
+    if (!window.confirm(`Delete environment "${activeEnv.name}"?`)) return;
+    const removedId = activeEnv.id;
+    const replacement = state.environments.find((e) => e.id !== removedId)?.id;
+    if (!replacement) return;
+    setState((s) => {
+      if (!s) return s;
+      return {
+        ...s,
+        environments: s.environments.filter((e) => e.id !== removedId),
+        collections: mapEveryRequest(s.collections, (r) =>
+          r.environmentId === removedId
+            ? { ...r, environmentId: replacement }
+            : r
+        ),
+      };
+    });
+  }, [state, activeEnv]);
 
   const onCheckUpdatesManual = useCallback(async () => {
     setMetaMenu(null);
@@ -498,20 +571,60 @@ export default function App() {
             <>
               <div className="section">
                 <h3>Environment</h3>
-                <select
-                  value={state.activeEnvironmentId ?? activeEnv?.id ?? ""}
-                  onChange={(e) =>
-                    setState((s) =>
-                      s ? { ...s, activeEnvironmentId: e.target.value } : s
-                    )
-                  }
-                >
-                  {state.environments.map((env) => (
-                    <option key={env.id} value={env.id}>
-                      {env.name}
-                    </option>
-                  ))}
-                </select>
+                <p className="response-meta env-scope-hint">
+                  This request uses the selected environment for{" "}
+                  <code>{"{{variables}}"}</code>. Other requests keep their own
+                  choice.
+                </p>
+                <div className="env-toolbar">
+                  <select
+                    data-testid="environment-select"
+                    aria-label="Environment for this request"
+                    value={activeRequest.environmentId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      updateActiveRequest((r) => ({ ...r, environmentId: v }));
+                    }}
+                  >
+                    {state.environments.map((env) => (
+                      <option key={env.id} value={env.id}>
+                        {env.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="env-toolbar-btn"
+                    data-testid="add-environment"
+                    onClick={() => onAddEnvironment()}
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    className="env-toolbar-btn"
+                    data-testid="rename-environment"
+                    onClick={() => onRenameEnvironment()}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="env-toolbar-btn"
+                    data-testid="duplicate-environment"
+                    onClick={() => onDuplicateEnvironment()}
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    className="env-toolbar-btn danger"
+                    data-testid="delete-environment"
+                    onClick={() => onDeleteEnvironment()}
+                  >
+                    Delete
+                  </button>
+                </div>
                 <div className="kv-grid" style={{ marginTop: 8 }}>
                   {(activeEnv?.variables ?? []).map((row, i) => (
                     <div className="kv-row" key={`${row.key}-${i}`}>
