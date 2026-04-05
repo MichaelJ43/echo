@@ -116,8 +116,8 @@ Use this to classify changes in **this** app:
 
 ### Ship it + CI
 
-- **`ship it` (Cursor rule):** classify the change as **patch**, **minor**, or **major** using the table above; put **Recommended semver bump** and a short rationale in the **PR body** (see `.cursor/rules/ship-it.mdc`).
-- **Automation:** `.github/workflows/version-bump.yml` bumps **patch** when a PR merges to `main`. If the PR warrants **minor** or **major**, after merge run **Actions → Version bump → Run workflow** and choose **minor** or **major** (or **patch** to align with the recommendation).
+- **`ship it` (Cursor rule):** classify the change as **patch**, **minor**, or **major** using the table above; put **Recommended semver bump** and a short rationale in the **PR body** (see `.cursor/rules/ship-it.mdc`). For **minor** or **major**, add **`+(semver:minor)`** or **`+(semver:major)`** to the **PR title** so merge bumps the right segment (optional **`+(semver:patch)`** to be explicit).
+- **Automation:** `.github/workflows/version-bump.yml` reads the merged **PR title** for `+(semver:patch|minor|major)`; if absent, it bumps **patch**. **workflow_dispatch** still bumps **patch**, **minor**, or **major** by choice.
 
 ---
 
@@ -135,7 +135,7 @@ Use this to classify changes in **this** app:
 
 **CI:** `.github/workflows/ci.yml` — Node install, `npm test`, `npm run build`, and `cargo test` in `src-tauri/` when Rust is available on the runner.
 
-**Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, bumps **patch**, pushes to `main`, pushes `v*` tag, then **`gh workflow run`** with **`GH_TOKEN` = PAT** (`unset GITHUB_TOKEN` for that invocation) so **Release** dispatches; **`GITHUB_TOKEN` alone often 401s** `workflow_dispatch`. **Fine-grained PAT** needs **Actions: Read and write** for dispatch, not only **Contents**. **workflow_dispatch** bumps **patch**, **minor**, or **major** manually. **Requires** **`RELEASE_PUSH_TOKEN`** or **`GH_PAT`** for git push and dispatch.
+**Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, chooses **patch** / **minor** / **major** from **PR title** tokens **`+(semver:patch)`**, **`+(semver:minor)`**, **`+(semver:major)`** (case-insensitive; default **patch** if none); pushes to `main`, pushes `v*` tag, then **`gh workflow run`** with **`GH_TOKEN` = PAT** (`unset GITHUB_TOKEN` for that invocation) so **Release** dispatches; **`GITHUB_TOKEN` alone often 401s** `workflow_dispatch`. **Fine-grained PAT** needs **Actions: Read and write** for dispatch, not only **Contents**. **workflow_dispatch** bumps **patch**, **minor**, or **major** by input. **Requires** **`RELEASE_PUSH_TOKEN`** or **`GH_PAT`** for git push and dispatch.
 
 **Release:** `.github/workflows/release.yml` — **`workflow_dispatch` only** (invoked by Version bump or manually). Matrix-build with `tauri-apps/tauri-action` (installers + `latest.json`). **Concurrency** is set on the **workflow** (not each matrix job) so all three OS jobs run in parallel; job-level `concurrency` with a tag-only group cancels the third matrix leg. Requires `TAURI_SIGNING_PRIVATE_KEY`. **Manual:** Actions → Release → **Run workflow** → tag (e.g. `v0.1.4`). **Do not** put `[skip ci]` on the release bump commit — it can skip workflows tied to that commit message.
 
