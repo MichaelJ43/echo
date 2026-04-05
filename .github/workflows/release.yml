@@ -1,13 +1,13 @@
 name: Release
 
+# Started by Version bump (workflow_dispatch via API) or manually. Tag push alone does not
+# reliably trigger workflows from automated pushes; do not rely on `on.push.tags` for CI-created tags.
+
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to build and upload (e.g. v0.1.2). Use after a failed tag push."
+        description: "Tag to build (e.g. v0.1.4). Must exist on the repo."
         required: true
         type: string
 
@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   publish:
+    concurrency:
+      group: release-${{ github.event.inputs.tag }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.inputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -68,5 +71,5 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           projectPath: src-tauri
-          tagName: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-          releaseName: Echo ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+          tagName: ${{ github.event.inputs.tag }}
+          releaseName: Echo ${{ github.event.inputs.tag }}

@@ -80,7 +80,7 @@ The app version is defined in `package.json`, `src-tauri/tauri.conf.json`, and `
 
 ### GitHub Actions: semver and releases
 
-- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits, pushes to `main`, and pushes a `v*` tag. That tag triggers the **Release** workflow. **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used only for those pushes. Pushes with the default Actions token do **not** trigger other workflows, so without this PAT the Release workflow never runs.
+- **Patch bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **patch** version, commits, pushes to `main`, pushes a `v*` tag, then **starts the Release workflow** via the API (`workflow_dispatch`). **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used for `git push` only (the default Actions token cannot push to `main` in this flow). **Tag push alone does not reliably start other workflows** from automation; the bump job explicitly dispatches Release.
 - **Manual minor or major:** In GitHub → **Actions** → **Version bump** → **Run workflow**, choose **minor** or **major**. The same bump → commit → tag flow runs with your selected segment.
 - **Local bump (any segment):** `npm run version:bump -- patch` (or `minor` / `major`).
 
@@ -101,9 +101,11 @@ The app checks for updates **on launch** and **every hour** while running (deskt
    - `src-tauri/*.key` and `src-tauri/*.key.pub` are **gitignored** so the generated files are not committed; the tracked copy of the public key is **`tauri.conf.json` only**.
 2. **Updater URL:** The default endpoint uses this repository. For forks, change the GitHub URL in `tauri.conf.json`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds when `GITHUB_REPOSITORY` is set.
 
-**Release workflow** (`.github/workflows/release.yml`) runs on **`v*` tags**, builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. It requires **`TAURI_SIGNING_PRIVATE_KEY`**. Automated releases also require **`RELEASE_PUSH_TOKEN`** on the **Version bump** workflow (see above).
+**Release workflow** (`.github/workflows/release.yml`) is **workflow_dispatch** only: it runs when **Version bump** dispatches it after a successful bump, or when you **Run workflow** manually and enter a tag (e.g. `v0.1.4`). It builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. Requires **`TAURI_SIGNING_PRIVATE_KEY`**. **`RELEASE_PUSH_TOKEN`** is for **Version bump** pushes, not for Release itself.
 
-**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT so tag pushes trigger Release; optional alias **`GH_PAT`**).
+**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT for Version bump git push; optional alias **`GH_PAT`**).
+
+**Tag exists but no GitHub Release / no installers:** open **Actions** → **Release** → **Run workflow** → type the tag (e.g. `v0.1.4`) → Run. That builds and attaches assets to a Release for that tag.
 
 ### Troubleshooting: Version bump failed on “Use PAT for git push”
 
