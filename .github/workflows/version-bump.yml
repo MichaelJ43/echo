@@ -67,7 +67,9 @@ jobs:
             exit 0
           fi
           VERSION=$(node -p "require('./package.json').version")
-          git commit -m "chore: release v${VERSION} [skip ci]"
+          # Do not use [skip ci]: that text skips workflows for this commit, including
+          # tag-triggered Release runs (the v* tag points at this commit).
+          git commit -m "chore: release v${VERSION}"
           git push origin main
           git tag "v${VERSION}"
           git push origin "refs/tags/v${VERSION}"
