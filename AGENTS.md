@@ -8,6 +8,7 @@
 
 - **Name:** `echo` (npm package private, version aligned with `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`).
 - **License:** MIT — see **`LICENSE`** at repo root (`package.json` and `src-tauri/Cargo.toml` declare `MIT`).
+- **Security:** **`SECURITY.md`** — vulnerability reporting and notes on dependency advisories constrained by upstream (e.g. Tauri’s Linux `glib` stack).
 - **Purpose:** Desktop **API client** (Postman-style): HTTP requests, collections tree, environments and `{{variables}}`, auth, response panel, optional completion scripts (`pm.*` shim). **Not** a trading or market app.
 - **Stack:** **Tauri 2** native shell, **Rust** backend (`src-tauri/`) for IPC commands, persistence, and HTTP via **reqwest**; **React 19** + **TypeScript** + **Vite** frontend (`src/`). Plain `npm run dev` runs the web UI only (localStorage + `fetch` fallbacks in `src/api.ts`); **`npm run tauri dev`** is the full desktop app.
 
