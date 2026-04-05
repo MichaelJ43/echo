@@ -33,7 +33,7 @@ Use **[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)** (offici
 - **Rationale:** (2–4 bullets tying the diff to SemVer criteria and §5b)
 ```
 
-4. **CI alignment:** Merging to `main` triggers **Version bump** with **patch** only. If the recommended bump is **minor** or **major**, state in the PR that **after merge** the maintainer should run **Actions → Version bump → Run workflow** and select **minor** or **major** (see `AGENTS.md` §5b / §6). Do **not** claim the automated merge path will bump minor/major.
+4. **CI alignment:** Merging to `main` triggers **Version bump**, which reads **`+(semver:patch)`**, **`+(semver:minor)`**, or **`+(semver:major)`** in the **PR title** (case-insensitive; default **patch**). If the recommended bump is **minor** or **major**, put the matching token in the **PR title** (e.g. `feat: add foo +(semver:minor)`). If the title cannot be edited, say to run **Actions → Version bump → Run workflow** after merge. Do **not** claim a merge bump unless the title hint or manual run matches.
 
 ## 1. Decide what to ship
 

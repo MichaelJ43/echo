@@ -61,11 +61,29 @@ jobs:
 
       - name: Choose bump kind
         id: kind
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_BUMP: ${{ inputs.bump }}
+          # workflow_dispatch has no pull_request context
+          PR_TITLE: ${{ github.event_name == 'pull_request' && github.event.pull_request.title || '' }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "bump=${{ inputs.bump }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "bump=$INPUT_BUMP" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Merged PR: optional title hint +(semver:patch|minor|major), case-insensitive; else patch
+          if printf '%s' "$PR_TITLE" | grep -qiE '\+\(semver:major\)'; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR title matched +(semver:major)"
+          elif printf '%s' "$PR_TITLE" | grep -qiE '\+\(semver:minor\)'; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR title matched +(semver:minor)"
+          elif printf '%s' "$PR_TITLE" | grep -qiE '\+\(semver:patch\)'; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR title matched +(semver:patch)"
           else
             echo "bump=patch" >> "$GITHUB_OUTPUT"
+            echo "::notice::No +(semver:…) in PR title; defaulting to patch"
           fi
 
       - name: Bump version in package.json, Cargo.toml, tauri.conf.json, lockfiles
