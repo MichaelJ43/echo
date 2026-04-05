@@ -302,3 +302,114 @@ textarea.body-input {
 .status-err {
   color: var(--danger);
 }
+
+/* Bottom-right update toast (Tauri) */
+.update-prompt {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1001;
+  max-width: min(380px, calc(100vw - 32px));
+  animation: update-prompt-in 0.2s ease-out;
+}
+
+@keyframes update-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.update-prompt-inner {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+.update-prompt-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.update-prompt-desc {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.update-prompt-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.update-prompt-link:hover {
+  color: #79c0ff;
+}
+
+.update-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.update-prompt-actions button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.update-prompt-actions button.primary {
+  background: #238636;
+  border-color: #238636;
+  color: #fff;
+}
+
+.update-prompt-actions button.primary:hover {
+  filter: brightness(1.08);
+}
+
+.update-prompt-actions button.muted {
+  color: var(--muted);
+  border-color: var(--border);
+  font-size: 11px;
+}
+
+.update-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1001;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.sidebar-title-label {
+  cursor: context-menu;
+  user-select: none;
+}
+
+.sidebar-title-label:hover {
+  color: var(--accent);
+}
