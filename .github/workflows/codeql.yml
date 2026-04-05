@@ -1,5 +1,10 @@
-# Advanced CodeQL setup so `.github/codeql/codeql-config.yml` is actually loaded.
-# Default ("dynamic") analysis often ignores that file; this workflow replaces it for Rust.
+# Advanced CodeQL: loads `.github/codeql/codeql-config.yml` via `init` → `config-file`.
+#
+# REQUIRED (repo Settings): disable GitHub "default setup" for CodeQL while this workflow
+# exists, or SARIF upload fails with:
+#   "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled"
+# Settings → Code security → Code scanning → CodeQL analysis → disable default setup.
+# https://docs.github.com/en/code-security/code-scanning/managing-your-code-scanning-configuration/editing-your-configuration-of-default-setup
 name: CodeQL
 
 on:
@@ -47,7 +52,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: rust
           config-file: ./.github/codeql/codeql-config.yml
@@ -57,6 +62,6 @@ jobs:
         run: cargo build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:rust"
