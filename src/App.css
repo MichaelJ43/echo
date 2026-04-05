@@ -419,11 +419,53 @@ textarea.body-input {
 }
 
 .sidebar-title-label {
-  cursor: context-menu;
+  cursor: pointer;
   user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: inherit;
+  text-align: left;
 }
 
 .sidebar-title-label:hover {
+  color: var(--accent);
+}
+
+.about-dialog {
+  width: min(420px, 100%);
+  max-height: min(480px, 90vh);
+  overflow: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  padding: 0 0 14px;
+}
+
+.about-dialog-body {
+  padding: 0 18px 4px;
+  line-height: 1.45;
+}
+
+.about-dialog-body p {
+  margin: 0 0 12px;
+}
+
+.about-dialog-version {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.about-dialog-muted {
+  color: var(--muted);
+}
+
+.about-dialog-body a {
   color: var(--accent);
 }
 
