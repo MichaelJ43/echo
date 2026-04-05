@@ -128,7 +128,8 @@ fn build_base_url(
 }
 
 /// Sends the configured HTTP request via `reqwest` (TLS for `https://` URLs).
-/// CodeQL may flag `rust/cleartext-transmission` on this path; see `.github/codeql/codeql-config.yml`.
+/// CodeQL `rust/cleartext-transmission` is a false positive for this HTTP client; suppression
+/// is configured in `.github/codeql/codeql-config.yml` and applied via `.github/workflows/codeql.yml`.
 pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePayload, String> {
     let mut mask_acc: Vec<String> = Vec::new();
 

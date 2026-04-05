@@ -67,7 +67,8 @@ src-tauri/                # Rust crate + Tauri config (required layout for CLI)
 test/e2e/                 # Playwright (smoke / UI against dev server)
 scripts/                  # make-icon.mjs, bump-version.mjs, inject-updater-endpoint.mjs
 docs/                     # usage.md, architecture.md
-.github/workflows/        # ci.yml, release.yml (tauri-apps/tauri-action on v* tags), version-bump.yml
+.github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
+.github/codeql/             # codeql-config.yml (query filters for workflow-driven CodeQL)
 ```
 
 **Imports:** ESM (`"type": "module"`). No `@/` path alias unless added to `tsconfig` / Vite—prefer relative imports matching existing files.
@@ -139,7 +140,7 @@ Use this to classify changes in **this** app:
 
 **CI:** `.github/workflows/ci.yml` — Node install, `npm test`, `npm run build`, and `cargo test` in `src-tauri/` when Rust is available on the runner.
 
-**Code scanning (GitHub CodeQL):** `.github/codeql/codeql-config.yml` — excludes `rust/cleartext-transmission` for this repo (HTTP client; HTTPS is TLS; query does not model transport encryption).
+**Code scanning (GitHub CodeQL):** `.github/workflows/codeql.yml` runs CodeQL with `config-file` set to `.github/codeql/codeql-config.yml`, which excludes `rust/cleartext-transmission` (HTTP client; `https://` uses TLS; the query does not model transport encryption). GitHub’s **default** CodeQL run often **ignores** that config file; the workflow replaces it so the exclude applies. If you still see a **second** failing CodeQL check from “default setup,” turn off duplicate default analysis under **Settings → Code security → Code scanning** (or keep only the workflow-driven run).
 
 **Version bump:** `.github/workflows/version-bump.yml` — on merged PR to `main`, chooses **patch** / **minor** / **major** from **PR title** tokens **`+(semver:patch)`**, **`+(semver:minor)`**, **`+(semver:major)`** (case-insensitive; default **patch** if none); pushes to `main`, pushes `v*` tag, then **`gh workflow run`** with **`GH_TOKEN` = PAT** (`unset GITHUB_TOKEN` for that invocation) so **Release** dispatches; **`GITHUB_TOKEN` alone often 401s** `workflow_dispatch`. **Fine-grained PAT** needs **Actions: Read and write** for dispatch, not only **Contents**. **workflow_dispatch** bumps **patch**, **minor**, or **major** by input. **Requires** **`RELEASE_PUSH_TOKEN`** or **`GH_PAT`** for git push and dispatch.
 
