@@ -1,0 +1,2 @@
+# Optional: used by scripts/compose-social-preview.py (GitHub social preview)
+pillow>=10.0.0

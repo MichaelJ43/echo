@@ -1,75 +1,60 @@
 /**
- * Writes a solid 1024×1024 RGBA PNG (no npm deps) for `tauri icon logo.png`.
+ * Produces square 1024×1024 `logo.png` + `public/logo.png` from `docs/logo-source.png`,
+ * then run: `tauri icon logo.png` (see `npm run icons`).
+ *
+ * - If the source is already 1024×1024 square, it is copied.
+ * - On Windows, non-square sources are center-cropped via `crop-logo-to-square.ps1`.
+ * - On other OSes, replace `docs/logo-source.png` with a square master or run this on Windows once.
  */
-import { deflateSync } from "node:zlib";
-import { writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { platform } from "node:os";
 
-const W = 1024;
-const H = 1024;
-const R = 30;
-const G = 58;
-const B = 95;
-const A = 255;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
+const src = join(root, "docs", "logo-source.png");
 
-const crcTable = new Uint32Array(256);
-for (let n = 0; n < 256; n++) {
-  let c = n;
-  for (let k = 0; k < 8; k++) {
-    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  }
-  crcTable[n] = c >>> 0;
+function pngDimensions(buf) {
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (buf.length < 24 || !buf.subarray(0, 8).equals(sig)) return null;
+  const i = buf.indexOf(Buffer.from("IHDR"));
+  if (i < 0) return null;
+  return { w: buf.readUInt32BE(i + 4), h: buf.readUInt32BE(i + 8) };
 }
 
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
+if (!existsSync(src)) {
+  console.error("Missing docs/logo-source.png — add the master app icon there.");
+  process.exit(1);
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const t = Buffer.from(type, "ascii");
-  const crcIn = Buffer.concat([t, data]);
-  const c = Buffer.alloc(4);
-  c.writeUInt32BE(crc32(crcIn), 0);
-  return Buffer.concat([len, t, data, c]);
+const buf = readFileSync(src);
+const dim = pngDimensions(buf);
+if (!dim) {
+  console.error("docs/logo-source.png is not a valid PNG.");
+  process.exit(1);
 }
 
-const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(W, 0);
-ihdr.writeUInt32BE(H, 4);
-ihdr[8] = 8;
-ihdr[9] = 6;
-ihdr[10] = 0;
-ihdr[11] = 0;
-ihdr[12] = 0;
+const dstRoot = join(root, "logo.png");
+const dstPublic = join(root, "public", "logo.png");
 
-const row = 1 + W * 4;
-const raw = Buffer.alloc(row * H);
-for (let y = 0; y < H; y++) {
-  const o = y * row;
-  raw[o] = 0;
-  for (let x = 0; x < W; x++) {
-    const p = o + 1 + x * 4;
-    raw[p] = R;
-    raw[p + 1] = G;
-    raw[p + 2] = B;
-    raw[p + 3] = A;
-  }
+if (dim.w === dim.h && dim.w === 1024) {
+  mkdirSync(join(root, "public"), { recursive: true });
+  copyFileSync(src, dstRoot);
+  copyFileSync(src, dstPublic);
+  console.log("Square 1024×1024: copied docs/logo-source.png → logo.png and public/logo.png");
+} else if (platform() === "win32") {
+  const ps = join(__dirname, "crop-logo-to-square.ps1");
+  const r = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
+    { cwd: root, stdio: "inherit" }
+  );
+  if (r.status !== 0) process.exit(r.status ?? 1);
+} else {
+  console.error(
+    `docs/logo-source.png is ${dim.w}×${dim.h} (Tauri requires a square source). On Windows run: npm run icons. Or replace docs/logo-source.png with a 1024×1024 square PNG.`
+  );
+  process.exit(1);
 }
-
-const idat = deflateSync(raw, { level: 9 });
-
-const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const png = Buffer.concat([
-  sig,
-  chunk("IHDR", ihdr),
-  chunk("IDAT", idat),
-  chunk("IEND", Buffer.alloc(0)),
-]);
-
-writeFileSync("logo.png", png);
-console.log("Wrote logo.png (1024×1024)");

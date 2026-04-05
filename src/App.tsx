@@ -354,13 +354,23 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar" data-testid="sidebar">
         <div className="sidebar-header">
-          <span
-            className="sidebar-title-label"
-            title="Right-click for more"
-            onContextMenu={onCollectionsContextMenu}
-          >
-            Collections
-          </span>
+          <div className="sidebar-header-brand">
+            <img
+              className="sidebar-app-icon"
+              src="/logo.png"
+              alt=""
+              width={26}
+              height={26}
+              decoding="async"
+            />
+            <span
+              className="sidebar-title-label"
+              title="Right-click for more"
+              onContextMenu={onCollectionsContextMenu}
+            >
+              Collections
+            </span>
+          </div>
           <button
             type="button"
             className="sidebar-header-action"

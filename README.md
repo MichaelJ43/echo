@@ -1,130 +1,37 @@
 # Echo
 
-Echo is a fast, cross-platform desktop API client (a Postman-style alternative) built with **Rust** (HTTP and persistence) and **Tauri 2** (native shell). The UI is **React** and **TypeScript**.
+<p align="center">
+  <img src="public/logo.png" alt="Echo" width="120" height="120" />
+</p>
 
-## Features
+<p align="center">
+  <a href="https://github.com/MichaelJ43/echo/actions/workflows/ci.yml"><img src="https://github.com/MichaelJ43/echo/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  &nbsp;
+  <a href="https://github.com/MichaelJ43/echo/actions/workflows/release.yml"><img src="https://github.com/MichaelJ43/echo/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+</p>
 
-- HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
-- URL, query parameters, headers, and body (JSON, raw, or form)
-- Environments with `{{variable}}` substitution
-- Authentication: none, Bearer, Basic, and API key (header or query)
-- Post-response scripts using `pm.response` and `pm.console.log`
-- Collections shown as a folder tree; active request highlighted
-- Response panel: status, timing, body
-- Workspace persisted under the OS app data directory (see [docs/usage.md](docs/usage.md))
-- Right-click a folder in the tree: **Export workspace** or **Import workspace** (JSON)
+**Echo** is a free, cross-platform **desktop app for exploring and testing HTTP APIs**—send requests, organize them in collections, switch environments, and inspect responses. It is a lightweight alternative to tools like Postman or Insomnia, with a dark, focused UI.
 
-## Prerequisites
+## Download
 
-- [Node.js](https://nodejs.org/) 20+
-- [Rust](https://www.rust-lang.org/tools/install) (stable)
-- Platform dependencies for Tauri: see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
+Installers and auto-updates are published on **[GitHub Releases](https://github.com/MichaelJ43/echo/releases)** for **Windows**, **macOS**, and **Linux**. The desktop app checks for updates on its own; you can also open the releases page from the app when an update is available.
 
-## Development
+A **web-only** build is not distributed as a product; the full experience is the **native desktop** build (faster HTTP via Rust, workspace on disk, OS integrations).
 
-```bash
-npm install
-npm run tauri dev
-```
+## What you can do
 
-Plain Vite (no native shell; workspace uses `localStorage`, HTTP uses `fetch`):
+- Send **GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS** with URL, query params, headers, and body (JSON, raw text, or form).
+- Use **environments** and `{{variables}}` in URLs, headers, and bodies.
+- Configure **authentication**: none, Bearer token, Basic, or API key (header or query).
+- Organize work in a **tree of collections and requests**; export or import the whole workspace as JSON.
+- Run optional **response scripts** (`pm.response`, `pm.console.log`) after each response.
+- Store **local secrets** in the OS credential manager (desktop) and reference them with `{{secret:NAME}}` in requests—values never live in your exported workspace file.
 
-```bash
-npm run dev
-```
+More detail: **[docs/usage.md](docs/usage.md)**.
 
-## Git workflow (branches and pull requests)
+## Contributing
 
-Use **topic branches** and open **pull requests** into `main` instead of pushing straight to `main` when you want review and CI. Suggested prefixes:
-
-- `feat/` — new feature
-- `fix/` — bugfix
-- `chore/` — tooling, config, or dependencies
-- `docs/` — documentation only
-
-Merge when CI is green. The version-bump and release workflows still assume **`main`** as the default branch.
-
-## Build
-
-Generate icon assets once (creates `logo.png` and `src-tauri/icons/*`):
-
-```bash
-npm run icons
-```
-
-Then build the desktop app (requires [Rust](https://www.rust-lang.org/tools/install) on your PATH):
-
-```bash
-npm run tauri build
-```
-
-Installers and bundles are emitted under `src-tauri/target/release/bundle/` (paths differ by OS). On **Windows** you typically get an **NSIS** `.exe` installer (and/or WiX `.msi` depending on tooling); on **macOS** a `.dmg` or `.app`; on **Linux** `.deb` / AppImage. It is **not** a single universal installer—Tauri produces **one installer format per platform** you build on.
-
-## Tests
-
-```bash
-npm test
-```
-
-End-to-end (Chromium; start the dev server separately or set `PW_BASE_URL`):
-
-```bash
-npm run dev
-# other terminal:
-PW_BASE_URL=http://127.0.0.1:1420 npm run test:e2e
-```
-
-## Versioning
-
-The app version is defined in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`. **CI keeps them aligned** when you use the workflows below.
-
-### GitHub Actions: semver and releases
-
-- **Bump on merge:** When a PR is merged into `main`, [`.github/workflows/version-bump.yml`](.github/workflows/version-bump.yml) bumps the **semver** segment, commits, pushes to `main`, pushes a `v*` tag, then **starts the Release workflow** via **`gh workflow run`** (same PAT as push; see below). **PR title hint (optional):** include **`+(semver:patch)`**, **`+(semver:minor)`**, or **`+(semver:major)`** anywhere in the title (case-insensitive). If omitted, the workflow bumps **patch**. **Required:** repository secret **`RELEASE_PUSH_TOKEN`** — a [PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) used for **`git push`** and **dispatching** Release (the default Actions token cannot push to `main`, and **`GITHUB_TOKEN` often 401s** workflow dispatch). **Tag push alone does not reliably start other workflows** from automation; the bump job explicitly dispatches Release.
-- **Manual bump:** In GitHub → **Actions** → **Version bump** → **Run workflow**, choose **patch**, **minor**, or **major** (same as a title hint, without relying on the merge event).
-- **Local bump (any segment):** `npm run version:bump -- patch` (or `minor` / `major`).
-
-Default branch is assumed to be **`main`**. If you use another name, update `version-bump.yml`.
-
-### Auto-updates (Tauri updater)
-
-The app checks for updates **on launch** and **every hour** while running (desktop build only). Updates are delivered from **GitHub Releases** via [`latest.json`](https://v2.tauri.app/plugin/updater/) (uploaded by `tauri-apps/tauri-action`).
-
-**One-time setup (or key rotation)**
-
-1. **Signing keys** — The **public** key in `plugins.updater.pubkey` in `tauri.conf.json` is **supposed to be** in the repo: clients use it to verify update signatures. It is **not** a secret. The **private** key must **never** be committed.
-   ```bash
-   npm run tauri -- signer generate --ci -w src-tauri/echo.key -f
-   ```
-   - Put the **public** key string (same as `echo.key.pub` on one line) into `plugins.updater.pubkey` in `tauri.conf.json` if you rotate keys.
-   - Add repository secret **`TAURI_SIGNING_PRIVATE_KEY`** with the **full contents** of `src-tauri/echo.key` (GitHub Actions release signing). For local release-style builds you can use `TAURI_SIGNING_PRIVATE_KEY_PATH` instead.
-   - `src-tauri/*.key` and `src-tauri/*.key.pub` are **gitignored** so the generated files are not committed; the tracked copy of the public key is **`tauri.conf.json` only**.
-2. **Updater URL:** The default endpoint uses this repository. For forks, change the GitHub URL in `tauri.conf.json`, **or** rely on CI: `scripts/inject-updater-endpoint.mjs` runs before release builds when `GITHUB_REPOSITORY` is set.
-
-**Release workflow** (`.github/workflows/release.yml`) is **workflow_dispatch** only: it runs when **Version bump** dispatches it after a successful bump, or when you **Run workflow** manually and enter a tag (e.g. `v0.1.4`). It builds on Windows / macOS / Linux, signs bundles, and publishes assets + updater metadata. Requires **`TAURI_SIGNING_PRIVATE_KEY`**. **`RELEASE_PUSH_TOKEN`** is used by **Version bump** for **git push** and **`gh workflow run`** (not by the Release job itself for auth).
-
-**Secrets checklist:** `TAURI_SIGNING_PRIVATE_KEY` (signing) · `RELEASE_PUSH_TOKEN` (PAT: git push + dispatch Release; optional alias **`GH_PAT`**; fine-grained needs **Actions: Read and write**).
-
-**Tag exists but no GitHub Release / no installers:** open **Actions** → **Release** → **Run workflow** → type the tag (e.g. `v0.1.4`) → Run. That builds and attaches assets to a Release for that tag.
-
-### Troubleshooting: Version bump failed on “Use PAT for git push”
-
-That means **no PAT was found**. Add a **repository** secret (Settings → Secrets and variables → **Actions** → **New repository secret**):
-
-1. Name: **`RELEASE_PUSH_TOKEN`** (exact), or **`GH_PAT`** as a fallback name.
-2. Value: a [fine-grained PAT](https://github.com/settings/tokens?type=beta) with access to **this repo**, **Contents: Read and write**, and **Actions: Read and write** (needed for `gh workflow run` / Release dispatch). Or a classic PAT with **`repo`** scope.
-3. Save, then **re-run** the failed workflow (**Re-run all jobs**) or **Actions** → **Version bump** → **Run workflow**.
-
-Secrets added under **Environments** only apply if the workflow declares that `environment`; this repo uses **repository** secrets.
-
-### Troubleshooting: Version bump fails when starting Release (HTTP 401 / dispatch error)
-
-Release is started with **`gh workflow run`** using the **same PAT** as git push (`RELEASE_PUSH_TOKEN` / `GH_PAT`), not `GITHUB_TOKEN` (that token often returns **401** for `workflow_dispatch` inside Actions).
-
-1. **Fine-grained PAT:** add repository permission **Actions → Read and write** (not only Contents). Regenerate the token if you change permissions, then update the repo secret.
-2. **Repo default token:** **Settings → Actions → General → Workflow permissions** can stay **Read and write**; org policy may still block.
-
-**Recovery:** If the version commit and tag already landed on `main`, run **Actions → Release → Run workflow** and enter that tag (e.g. `v0.1.7`).
+If you want to **build features or fix bugs**, see **[docs/contributors.md](docs/contributors.md)**.
 
 ## License
 

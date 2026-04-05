@@ -58,15 +58,16 @@ src/                      # React + TS UI, Vite client
   lib/                    # variables, collection helpers, scriptRunner, secretPlaceholders
   types.ts
   *.test.ts(x)            # Vitest co-located tests
+public/                   # Static assets for Vite (e.g. logo.png for favicon + sidebar)
 src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   src/lib.rs, main.rs
   src/http_client.rs, persistence.rs, secrets.rs
   tauri.conf.json, Cargo.toml, capabilities/, permissions/
-  icons/                  # Generated via npm run icons (see README)
+  icons/                  # Generated via npm run icons (see README, scripts/make-icon.mjs)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
 test/e2e/                 # Playwright (smoke / UI against dev server)
-scripts/                  # make-icon.mjs, bump-version.mjs, inject-updater-endpoint.mjs
-docs/                     # usage.md, architecture.md
+scripts/                  # make-icon.mjs, crop-logo-to-square.ps1, compose-social-preview.py, run-compose-social.mjs, requirements-images.txt, bump-version.mjs, inject-updater-endpoint.mjs
+docs/                     # usage.md, architecture.md, contributors.md, logo-source.png, github-social-preview.png (generated), github-social-preview-template.png (optional ref export from compose script)
 .github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
 .github/codeql/             # codeql-config.yml (query filters for workflow-driven CodeQL)
 ```
@@ -87,7 +88,7 @@ docs/                     # usage.md, architecture.md
   - **Before creating a branch:** `git fetch origin` and `git checkout main` + `git pull origin main` so the branch starts from current upstream `main`.
   - **PRs:** Open against `main`; keep commits scoped; describe behavior changes in the PR body.
   - **Never commit:** signing private keys (`src-tauri/*.key`), `.env`, or other secrets—use GitHub **Actions** secrets (e.g. `TAURI_SIGNING_PRIVATE_KEY`) only.
-- **Icons:** `npm run icons` generates `logo.png` and refreshes `src-tauri/icons/` (see `scripts/make-icon.mjs`).
+- **Icons:** Canonical master is **`docs/logo-source.png`**. `npm run icons` runs `scripts/make-icon.mjs` (center-crops to 1024×1024 on Windows via `crop-logo-to-square.ps1` if needed), writes **`logo.png`** (1024×1024 for `tauri icon`) and **`public/logo.png`** (256×256 for Vite favicon + in-app image), then `tauri icon logo.png` refreshes **`src-tauri/icons/`** (taskbar, dock, installers). **`scripts/compose-social-preview.py`** (Pillow: `pip install -r scripts/requirements-images.txt`) draws the social banner in code (no overlaid PNG with rulers), pastes **`logo-source`** centered in the **left third**, writes **`docs/github-social-preview.png`**, and re-exports a clean **`docs/github-social-preview-template.png`** (layout **without** the logo) for reference; **`run-compose-social.mjs`** runs it after Tauri icons (skips with a warning if Python/Pillow is missing). Change layout in **`build_template()`** in that script, not by editing an annotated raster. On non-Windows, use a square source or run icon generation on Windows once and commit outputs.
 
 ---
 

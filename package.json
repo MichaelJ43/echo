@@ -13,7 +13,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "tsc -b --noEmit",
-    "icons": "node scripts/make-icon.mjs && tauri icon logo.png",
+    "icons": "node scripts/make-icon.mjs && tauri icon logo.png && node scripts/run-compose-social.mjs",
     "tauri:build": "node scripts/inject-updater-endpoint.mjs && tauri build",
     "version:bump": "node scripts/bump-version.mjs"
   },
