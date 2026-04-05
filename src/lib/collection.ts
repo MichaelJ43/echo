@@ -14,10 +14,11 @@ export function createFolderNode(name: string): CollectionNode {
   };
 }
 
-export function createRequestItem(name: string): RequestItem {
+export function createRequestItem(name: string, environmentId: string): RequestItem {
   return {
     id: newId(),
     name,
+    environmentId,
     method: "GET",
     url: "",
     headers: [],
@@ -91,6 +92,22 @@ export function findRequest(
     }
   }
   return null;
+}
+
+export function mapEveryRequest(
+  nodes: CollectionNode[],
+  fn: (r: RequestItem) => RequestItem
+): CollectionNode[] {
+  return nodes.map((n) => {
+    if (n.nodeType === "request") {
+      const { nodeType: _, ...rest } = n;
+      return { nodeType: "request" as const, ...fn(rest as RequestItem) };
+    }
+    return {
+      ...n,
+      children: mapEveryRequest(n.children, fn),
+    };
+  });
 }
 
 export function mapCollection(

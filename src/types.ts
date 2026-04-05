@@ -13,6 +13,8 @@ export type AuthConfig =
 export type RequestItem = {
   id: string;
   name: string;
+  /** Which environment definition this request uses for `{{variables}}`. */
+  environmentId: string;
   method: string;
   url: string;
   headers: KeyValue[];
@@ -35,7 +37,6 @@ export type Environment = {
 
 export type AppState = {
   version: number;
-  activeEnvironmentId: string | null;
   environments: Environment[];
   collections: CollectionNode[];
   activeRequestId: string | null;

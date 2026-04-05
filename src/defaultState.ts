@@ -6,7 +6,6 @@ export function createDefaultState(): AppState {
   const eid = crypto.randomUUID();
   return {
     version: 1,
-    activeEnvironmentId: eid,
     environments: [
       {
         id: eid,
@@ -24,6 +23,7 @@ export function createDefaultState(): AppState {
             nodeType: "request",
             id: rid,
             name: "Example GET",
+            environmentId: eid,
             method: "GET",
             url: "https://httpbin.org/get",
             headers: [],

@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { createDefaultState } from "./defaultState";
+import { migrateAppState } from "./lib/migrateAppState";
 import { payloadContainsSecretPlaceholder } from "./lib/secretPlaceholders";
 import type { AppState, AuthConfig, HttpResponsePayload, KeyValue } from "./types";
 
@@ -109,7 +110,7 @@ function loadLocal(): AppState {
   const raw = localStorage.getItem(LS_KEY);
   if (!raw) return createDefaultState();
   try {
-    return JSON.parse(raw) as AppState;
+    return migrateAppState(JSON.parse(raw));
   } catch {
     return createDefaultState();
   }
@@ -122,7 +123,7 @@ function saveLocal(state: AppState): void {
 export async function loadState(): Promise<AppState> {
   if (!isTauri()) return loadLocal();
   try {
-    return await invoke<AppState>("load_state");
+    return migrateAppState(await invoke<AppState>("load_state"));
   } catch {
     return loadLocal();
   }
@@ -167,7 +168,7 @@ export async function deleteSecret(key: string): Promise<void> {
 }
 
 export async function importWorkspaceFile(path: string): Promise<AppState> {
-  return invoke<AppState>("import_workspace_file", { path });
+  return migrateAppState(await invoke<AppState>("import_workspace_file", { path }));
 }
 
 export async function exportWorkspaceFile(

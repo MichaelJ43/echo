@@ -10,7 +10,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 vi.mock("./api", () => ({
   loadState: vi.fn(async () => ({
     version: 1,
-    activeEnvironmentId: "e1",
     environments: [{ id: "e1", name: "Default", variables: [] }],
     collections: [
       {
@@ -22,6 +21,7 @@ vi.mock("./api", () => ({
             nodeType: "request",
             id: "r1",
             name: "Test",
+            environmentId: "e1",
             method: "GET",
             url: "https://example.com",
             headers: [],

@@ -22,6 +22,8 @@ When you run the **web-only** dev server (`npm run dev` without Tauri), the work
 
 Define variables in the **Environment** section. Use `{{variableName}}` in the URL, headers, query parameters, body, and auth fields. Disabled rows are ignored.
 
+Each **request** has its own **environment** choice in the dropdown (Add, Rename, Duplicate, and Delete manage the shared environment definitions). Changing the environment for one request does not change other requests. Multiple requests can share the same environment definition; editing variables for that definition updates it for every request that uses it.
+
 On the **desktop app**, you can also store sensitive values in the OS credential manager (**Local secrets** in the menu) and reference them with `{{secret:NAME}}` in the same places. `NAME` may contain letters, digits, underscores, hyphens, and periods (for example `API_TOKEN`, `api-key`, `stripe.secret`). Those values are never written into exported workspace JSON; Echo reads them from the credential store only when you send a request.
 
 ## Authentication
