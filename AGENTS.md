@@ -20,9 +20,12 @@
 | `src/App.tsx` | Main UI: collection tree, request editor, response, environments. |
 | `src/api.ts` | Tauri `invoke` + `isTauri()`; browser fallbacks when not in the webview. |
 | `src-tauri/src/main.rs` | Rust binary entry; calls `echo_lib::run()`. |
-| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`** (open GitHub releases in the system browser). |
+| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`**, **`list_secret_keys` / `set_secret` / `delete_secret`** (OS keychain). |
 | `src/lib/updater.ts` | Desktop-only: `check` + `downloadAndInstall` + `relaunch`; scheduled on app load + hourly; **`openGitHubReleasesPage`** uses `invoke("open_external_url")` in Tauri (WebView `window.open` is unreliable). |
-| `src-tauri/src/http_client.rs` | `reqwest` request execution; variable substitution `{{name}}`. |
+| `src-tauri/src/http_client.rs` | `reqwest` request execution; env substitution `{{name}}`, then `{{secret:NAME}}` from keychain at send time; masks secret values in outbound error strings. |
+| `src-tauri/src/secrets.rs` | OS credential store (`keyring` crate) + `secret_index.json` (key names only, app data dir). |
+| `src/lib/secretPlaceholders.ts` | Detects `{{secret:…}}` in payloads (browser path rejects; desktop resolves in Rust only). |
+| `src/components/SecretsDialog.tsx` | Manage local secrets (Collections header context menu). |
 | `src-tauri/src/persistence.rs` | Workspace types, `collections.json` under app data dir. |
 
 **Dev (web only):** `npm run dev` → Vite on port **1420** (see `vite.config.ts`).
@@ -38,7 +41,7 @@
 ## 3. High-level data flow
 
 1. **UI state:** `AppState` (collections, environments, active request id) loaded via `load_state` / saved debounced via `save_state`.
-2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`).
+2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`). **`{{secret:NAME}}`** placeholders are **not** resolved in the UI; Rust loads values from the host keychain only when building the outbound request. Plain web build errors if secrets are present.
 3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`.
 4. **Import/export:** Dialog plugin + `import_workspace_file` / `export_workspace_file` (full workspace JSON).
 5. **Collections tree:** Root **+ Collection** adds a top-level folder. Folder context menu: create nested folder, create request (prompts for names), export/import workspace, delete folder (confirm). Request context menu: delete (confirm). Mutations use helpers in `src/lib/collection.ts` (`addChildToFolder`, `removeNodeById`, etc.) from `App.tsx` / `components/TreeNodes.tsx`.
@@ -51,13 +54,13 @@
 src/                      # React + TS UI, Vite client
   api.ts                  # Tauri invoke + browser fallbacks
   App.tsx, App.css        # Root layout
-  components/             # e.g. TreeNodes
-  lib/                    # variables, collection helpers, scriptRunner
+  components/             # TreeNodes, UpdatePrompt, SecretsDialog
+  lib/                    # variables, collection helpers, scriptRunner, secretPlaceholders
   types.ts
   *.test.ts(x)            # Vitest co-located tests
 src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   src/lib.rs, main.rs
-  src/http_client.rs, persistence.rs
+  src/http_client.rs, persistence.rs, secrets.rs
   tauri.conf.json, Cargo.toml, capabilities/, permissions/
   icons/                  # Generated via npm run icons (see README)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle

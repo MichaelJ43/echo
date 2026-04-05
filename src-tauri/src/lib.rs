@@ -1,5 +1,6 @@
 mod http_client;
 mod persistence;
+mod secrets;
 
 use persistence::{export_to_path, import_from_path, load_workspace, save_workspace, AppState};
 use serde::Serialize;
@@ -65,6 +66,21 @@ fn open_external_url(url: String) -> Result<(), String> {
     open::that(url).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn list_secret_keys(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    secrets::list_secret_keys(&app)
+}
+
+#[tauri::command]
+fn set_secret(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    secrets::set_secret(&app, key, value)
+}
+
+#[tauri::command]
+fn delete_secret(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    secrets::delete_secret(&app, key)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -80,7 +96,10 @@ pub fn run() {
             write_text_file,
             import_workspace_file,
             export_workspace_file,
-            open_external_url
+            open_external_url,
+            list_secret_keys,
+            set_secret,
+            delete_secret
         ])
         .setup(|app| {
             let handle = app.handle().clone();

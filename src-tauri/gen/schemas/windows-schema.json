@@ -183,6 +183,12 @@
           "markdownDescription": "Open HTTPS URLs in the system default browser (GitHub releases)."
         },
         {
+          "description": "List, set, and delete local secrets stored in the OS credential manager.",
+          "type": "string",
+          "const": "allow-secrets",
+          "markdownDescription": "List, set, and delete local secrets stored in the OS credential manager."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

@@ -413,3 +413,149 @@ textarea.body-input {
 .sidebar-title-label:hover {
   color: var(--accent);
 }
+
+/* Local secrets modal */
+.secrets-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.secrets-dialog {
+  width: min(480px, 100%);
+  max-height: min(560px, 90vh);
+  overflow: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  padding: 0 0 14px;
+}
+
+.secrets-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.secrets-dialog-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.secrets-dialog-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.secrets-dialog-close:hover {
+  color: var(--text);
+}
+
+.secrets-dialog-hint {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.secrets-dialog-hint code {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.secrets-dialog-err {
+  margin: 0 14px 8px;
+  font-size: 12px;
+}
+
+.secrets-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 12px;
+  align-items: center;
+}
+
+.secrets-add-row input {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.secrets-add-row button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.secrets-dialog-muted {
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.secrets-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px;
+}
+
+.secrets-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.secrets-list li code {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.secrets-list button.danger {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.secrets-list button.danger:hover {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.secrets-list-empty {
+  justify-content: center !important;
+  color: var(--muted);
+  font-style: italic;
+}
