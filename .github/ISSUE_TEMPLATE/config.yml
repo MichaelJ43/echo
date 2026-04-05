@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/MichaelJ43/echo/security/advisories/new
+    about: Use GitHub private security advisories (see SECURITY.md). Do not file public issues for undisclosed vulnerabilities.
