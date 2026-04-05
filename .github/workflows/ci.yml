@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+# Default token permissions (CodeQL: actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 jobs:
   frontend:
     runs-on: ubuntu-latest
