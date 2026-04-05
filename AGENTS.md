@@ -41,6 +41,7 @@
 2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`).
 3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`.
 4. **Import/export:** Dialog plugin + `import_workspace_file` / `export_workspace_file` (full workspace JSON).
+5. **Collections tree:** Root **+ Collection** adds a top-level folder. Folder context menu: create nested folder, create request (prompts for names), export/import workspace, delete folder (confirm). Request context menu: delete (confirm). Mutations use helpers in `src/lib/collection.ts` (`addChildToFolder`, `removeNodeById`, etc.) from `App.tsx` / `components/TreeNodes.tsx`.
 
 ---
 
@@ -74,7 +75,12 @@ docs/                     # usage.md, architecture.md
 - **Tauri:** `src-tauri/tauri.conf.json` — app id `dev.echo.app`, window, bundle (`createUpdaterArtifacts`), `beforeDevCommand` / `frontendDist`, `plugins.updater` (pubkey + endpoints; GitHub `latest.json` URL).
 - **Rust:** `src-tauri/Cargo.toml` — crate name `echo`, dependencies for `tauri`, `reqwest`, `tauri-plugin-updater`, `tauri-plugin-process`, etc.
 - **Secrets:** No API keys in repo; user data lives in app data. **Release signing:** `TAURI_SIGNING_PRIVATE_KEY` in GitHub Actions only (never commit the private key file). The **public** updater key in `tauri.conf.json` is **not** a secret (embedded for signature verification). Respect `.cursorignore` for `.env*`.
-- **Git workflow:** Work on branches such as `feat/…`, `fix/…`, `chore/…`, `docs/…` and open PRs into `main`; avoid pushing secrets or `src-tauri/*.key`.
+- **Git and branches (required):**
+  - **Default branch:** `main`. Do **not** push routine feature work directly to `main`. Use **topic branch → pull request → merge** so CI runs and changes are reviewable.
+  - **Branch names:** Prefix + short slug, e.g. `feat/collection-create-delete`, `fix/dialog-windows`, `chore/deps`, `docs/agents`. Match the work (feature, fix, chore, docs).
+  - **Before creating a branch:** `git fetch origin` and `git checkout main` + `git pull origin main` so the branch starts from current upstream `main`.
+  - **PRs:** Open against `main`; keep commits scoped; describe behavior changes in the PR body.
+  - **Never commit:** signing private keys (`src-tauri/*.key`), `.env`, or other secrets—use GitHub **Actions** secrets (e.g. `TAURI_SIGNING_PRIVATE_KEY`) only.
 - **Icons:** `npm run icons` generates `logo.png` and refreshes `src-tauri/icons/` (see `scripts/make-icon.mjs`).
 
 ---
