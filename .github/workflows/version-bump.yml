@@ -29,22 +29,24 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Pushes made with the default GITHUB_TOKEN do not trigger other workflows (by GitHub design).
-      # The Release workflow must see a real tag push, so we use a PAT for checkout + push.
-      - name: Require RELEASE_PUSH_TOKEN
-        env:
-          PAT: ${{ secrets.RELEASE_PUSH_TOKEN }}
-        run: |
-          if [ -z "$PAT" ]; then
-            echo "::error::Add repository secret RELEASE_PUSH_TOKEN (fine-grained PAT: Contents Read/Write on this repo, or classic PAT with repo scope). Without it, tag pushes from this job never trigger the Release workflow."
-            exit 1
-          fi
-
+      # Pushes made with GITHUB_TOKEN do not trigger other workflows. Configure `origin` with a PAT
+      # so `git push` (commit + tag) triggers the Release workflow. Read-only checkout uses the default token.
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_PUSH_TOKEN }}
+
+      - name: Use PAT for git push (triggers Release on tag)
+        env:
+          PAT: ${{ secrets.RELEASE_PUSH_TOKEN }}
+          PAT_ALT: ${{ secrets.GH_PAT }}
+        run: |
+          TOKEN="${PAT:-$PAT_ALT}"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Add a repository Actions secret named RELEASE_PUSH_TOKEN (recommended) or GH_PAT: a Personal Access Token with Contents: Read and write on this repo. Without it, pushes use only GITHUB_TOKEN and the Release workflow will not run. See README (Versioning)."
+            exit 1
+          fi
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
       - uses: actions/setup-node@v4
         with:
