@@ -3,6 +3,7 @@ name = "echo"
 version = "0.4.1"
 description = "Echo API client"
 edition = "2021"
+license = "MIT"
 
 [lib]
 name = "echo_lib"

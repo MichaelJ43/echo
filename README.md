@@ -35,4 +35,4 @@ If you want to **build features or fix bugs**, see **[docs/contributors.md](docs
 
 ## License
 
-MIT (add your preferred license).
+[MIT](LICENSE)
