@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default window capability","local":true,"windows":["main"],"permissions":["core:default","dialog:default","dialog:allow-open","dialog:allow-save","updater:default","process:default"]}}
+{"default":{"identifier":"default","description":"Default window capability","local":true,"windows":["main"],"permissions":["core:default","dialog:default","dialog:allow-open","dialog:allow-save","updater:default","process:default","allow-open-external-url"]}}

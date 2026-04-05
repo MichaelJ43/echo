@@ -1,4 +1,4 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { isAutoUpdatePromptBlocked } from "./updaterPolicy";
 
@@ -71,7 +71,11 @@ export async function fetchUpdateForAutoPrompt(): Promise<Update | null> {
   return await fetchUpdateIfAvailable();
 }
 
-export function openGitHubReleasesPage(): void {
+export async function openGitHubReleasesPage(): Promise<void> {
+  if (isTauri()) {
+    await invoke("open_external_url", { url: GITHUB_RELEASES_LATEST_URL });
+    return;
+  }
   window.open(GITHUB_RELEASES_LATEST_URL, "_blank", "noopener,noreferrer");
 }
 

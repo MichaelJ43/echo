@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-open-external-url"
+description = "Open HTTPS URLs in the system default browser (GitHub releases)."
+commands.allow = ["open_external_url"]

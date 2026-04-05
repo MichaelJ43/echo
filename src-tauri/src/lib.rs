@@ -59,6 +59,12 @@ fn export_workspace_file(path: String, state: AppState) -> Result<(), String> {
     export_to_path(Path::new(&path), &state)
 }
 
+/// Opens a URL in the system default browser (WebView `window.open` is unreliable on desktop).
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    open::that(url).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -73,7 +79,8 @@ pub fn run() {
             read_text_file,
             write_text_file,
             import_workspace_file,
-            export_workspace_file
+            export_workspace_file,
+            open_external_url
         ])
         .setup(|app| {
             let handle = app.handle().clone();

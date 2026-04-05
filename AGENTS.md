@@ -20,8 +20,8 @@
 | `src/App.tsx` | Main UI: collection tree, request editor, response, environments. |
 | `src/api.ts` | Tauri `invoke` + `isTauri()`; browser fallbacks when not in the webview. |
 | `src-tauri/src/main.rs` | Rust binary entry; calls `echo_lib::run()`. |
-| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths. |
-| `src/lib/updater.ts` | Desktop-only: `check` + `downloadAndInstall` + `relaunch`; scheduled on app load + hourly. |
+| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`** (open GitHub releases in the system browser). |
+| `src/lib/updater.ts` | Desktop-only: `check` + `downloadAndInstall` + `relaunch`; scheduled on app load + hourly; **`openGitHubReleasesPage`** uses `invoke("open_external_url")` in Tauri (WebView `window.open` is unreliable). |
 | `src-tauri/src/http_client.rs` | `reqwest` request execution; variable substitution `{{name}}`. |
 | `src-tauri/src/persistence.rs` | Workspace types, `collections.json` under app data dir. |
 
@@ -58,7 +58,7 @@ src/                      # React + TS UI, Vite client
 src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   src/lib.rs, main.rs
   src/http_client.rs, persistence.rs
-  tauri.conf.json, Cargo.toml, capabilities/
+  tauri.conf.json, Cargo.toml, capabilities/, permissions/
   icons/                  # Generated via npm run icons (see README)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
 test/e2e/                 # Playwright (smoke / UI against dev server)

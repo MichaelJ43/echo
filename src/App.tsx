@@ -679,7 +679,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setMetaMenu(null);
-              openGitHubReleasesPage();
+              void openGitHubReleasesPage();
             }}
           >
             View releases
