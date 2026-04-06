@@ -1,6 +1,6 @@
 [package]
 name = "echo"
-version = "0.8.4"
+version = "0.9.0"
 description = "Echo API client"
 edition = "2021"
 license = "MIT"
