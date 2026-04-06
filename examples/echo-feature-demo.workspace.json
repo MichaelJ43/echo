@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "environments": [
+    {
+      "id": "e0000001-0000-4000-8000-000000000001",
+      "name": "Demo",
+      "variables": [
+        { "key": "httpbin", "value": "https://httpbin.org", "enabled": true },
+        {
+          "key": "jsonplaceholder",
+          "value": "https://jsonplaceholder.typicode.com",
+          "enabled": true
+        },
+        { "key": "demo_label", "value": "alpha", "enabled": true }
+      ]
+    },
+    {
+      "id": "e0000002-0000-4000-8000-000000000002",
+      "name": "Alt",
+      "variables": [
+        { "key": "httpbin", "value": "https://httpbin.org", "enabled": true },
+        {
+          "key": "jsonplaceholder",
+          "value": "https://jsonplaceholder.typicode.com",
+          "enabled": true
+        },
+        { "key": "demo_label", "value": "beta", "enabled": true }
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "nodeType": "folder",
+      "id": "f0000001-0000-4000-8000-000000000001",
+      "name": "Echo feature demo",
+      "children": [
+        {
+          "nodeType": "folder",
+          "id": "f0000002-0000-4000-8000-000000000001",
+          "name": "Basics — methods & body",
+          "children": [
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000001",
+              "name": "GET — query params",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/get",
+              "headers": [],
+              "queryParams": [
+                { "key": "q", "value": "{{demo_label}}", "enabled": true },
+                { "key": "client", "value": "echo", "enabled": true }
+              ],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000002",
+              "name": "POST — JSON body",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "POST",
+              "url": "{{httpbin}}/post",
+              "headers": [],
+              "queryParams": [],
+              "body": "{\n  \"app\": \"Echo\",\n  \"note\": \"JSON body with Content-Type\"\n}",
+              "bodyType": "json",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000007",
+              "name": "POST — raw body",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "POST",
+              "url": "{{httpbin}}/post",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain; charset=utf-8",
+                  "enabled": true
+                }
+              ],
+              "queryParams": [],
+              "body": "Plain text body (raw). Set Content-Type in Headers if needed.",
+              "bodyType": "raw",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000003",
+              "name": "POST — form (x-www-form-urlencoded)",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "POST",
+              "url": "{{httpbin}}/post",
+              "headers": [],
+              "queryParams": [],
+              "body": "app=Echo&source=demo",
+              "bodyType": "form",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000004",
+              "name": "GET — custom headers",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/headers",
+              "headers": [
+                { "key": "X-Echo-Demo", "value": "true", "enabled": true }
+              ],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000005",
+              "name": "HEAD",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "HEAD",
+              "url": "{{httpbin}}/get",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000006",
+              "name": "OPTIONS",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "OPTIONS",
+              "url": "{{httpbin}}/get",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            }
+          ]
+        },
+        {
+          "nodeType": "folder",
+          "id": "f0000003-0000-4000-8000-000000000001",
+          "name": "Environments — {{variables}} in URL",
+          "children": [
+            {
+              "nodeType": "request",
+              "id": "r0000002-0000-4000-8000-000000000001",
+              "name": "GET — {{httpbin}} in URL",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/uuid",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            }
+          ]
+        },
+        {
+          "nodeType": "folder",
+          "id": "f0000004-0000-4000-8000-000000000001",
+          "name": "Auth — httpbin (public demos)",
+          "children": [
+            {
+              "nodeType": "request",
+              "id": "r0000003-0000-4000-8000-000000000001",
+              "name": "Bearer",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/bearer",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "bearer", "token": "my-public-demo-token" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000003-0000-4000-8000-000000000002",
+              "name": "Basic (user demo / pass secret)",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "https://httpbin.org/basic-auth/demo/secret",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": {
+                "type": "basic",
+                "username": "demo",
+                "password": "secret"
+              },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000003-0000-4000-8000-000000000003",
+              "name": "API key in header",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/headers",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": {
+                "type": "apiKey",
+                "key": "X-Api-Token",
+                "value": "public-demo-value",
+                "addTo": "header"
+              },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000003-0000-4000-8000-000000000004",
+              "name": "API key in query",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/get",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": {
+                "type": "apiKey",
+                "key": "api_key",
+                "value": "query-demo",
+                "addTo": "query"
+              },
+              "script": ""
+            }
+          ]
+        },
+        {
+          "nodeType": "folder",
+          "id": "f0000005-0000-4000-8000-000000000001",
+          "name": "JSONPlaceholder — CRUD",
+          "children": [
+            {
+              "nodeType": "request",
+              "id": "r0000004-0000-4000-8000-000000000001",
+              "name": "GET post 1",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{jsonplaceholder}}/posts/1",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000004-0000-4000-8000-000000000002",
+              "name": "PUT post 1",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "PUT",
+              "url": "{{jsonplaceholder}}/posts/1",
+              "headers": [],
+              "queryParams": [],
+              "body": "{\n  \"id\": 1,\n  \"title\": \"Echo demo PUT\",\n  \"body\": \"replaced\",\n  \"userId\": 1\n}",
+              "bodyType": "json",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000004-0000-4000-8000-000000000003",
+              "name": "PATCH post 1",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "PATCH",
+              "url": "{{jsonplaceholder}}/posts/1",
+              "headers": [],
+              "queryParams": [],
+              "body": "{\n  \"title\": \"Echo demo PATCH\"\n}",
+              "bodyType": "json",
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000004-0000-4000-8000-000000000004",
+              "name": "DELETE post 1",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "DELETE",
+              "url": "{{jsonplaceholder}}/posts/1",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": ""
+            }
+          ]
+        },
+        {
+          "nodeType": "folder",
+          "id": "f0000006-0000-4000-8000-000000000001",
+          "name": "Completion scripts (pm.*)",
+          "children": [
+            {
+              "nodeType": "request",
+              "id": "r0000005-0000-4000-8000-000000000001",
+              "name": "Script — parse httpbin JSON",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "GET",
+              "url": "{{httpbin}}/json",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "none",
+              "auth": { "type": "none" },
+              "script": "const data = pm.response.json();\nconst author = data.slideshow && data.slideshow.author;\nconsole.log(\"Slideshow author:\", author);\nconsole.log(\"HTTP status:\", pm.response.status());"
+            },
+            {
+              "nodeType": "request",
+              "id": "r0000005-0000-4000-8000-000000000002",
+              "name": "Script — JSONPlaceholder create post",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "POST",
+              "url": "{{jsonplaceholder}}/posts",
+              "headers": [],
+              "queryParams": [],
+              "body": "{\n  \"title\": \"Echo completion script\",\n  \"body\": \"Check the script log below after Send.\",\n  \"userId\": 1\n}",
+              "bodyType": "json",
+              "auth": { "type": "none" },
+              "script": "const created = pm.response.json();\nconsole.log(\"New post id:\", created.id);\nconsole.log(\"Title:\", created.title);\nconsole.log(\"Status code:\", pm.response.status());"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "activeRequestId": "r0000005-0000-4000-8000-000000000002"
+}

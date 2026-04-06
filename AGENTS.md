@@ -43,10 +43,11 @@
 ## 3. High-level data flow
 
 1. **UI state:** `AppState` (collections, environments, active request id) loaded via `load_state` / saved debounced via `save_state`.
-2. **Send:** Frontend builds `SendRequestPayload` → `send_http_request` in Rust when `isTauri()`; otherwise `fetch` in `sendHttpRequestBrowser` (`src/api.ts`). **`{{secret:NAME}}`** placeholders are **not** resolved in the UI; Rust loads values from the host keychain only when building the outbound request. Plain web build errors if secrets are present.
-3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`.
+2. **Send:** `buildExpandedSendPayload` (`src/lib/expandForSend.ts`) resolves **`{{request:folder/sub/requestName:json.dot.path}}`** against an in-memory **last-response cache** (per request id; not persisted), then **`{{variable}}`** from the active environment, then builds `SendRequestPayload` → `send_http_request` (Tauri) or `sendHttpRequestBrowser` (`src/api.ts`). **`{{secret:NAME}}`** is still resolved only in Rust for the desktop app; web build errors if secrets are present.
+3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`. Response cache for request chaining is **session-only** (RAM).
 4. **Import/export:** Dialog plugin + `import_workspace_file` / `export_workspace_file` (full workspace JSON).
-5. **Collections tree:** Root **+ Collection** adds a top-level folder. Folder context menu: create nested folder, create request (prompts for names), export/import workspace, delete folder (confirm). Request context menu: delete (confirm). Mutations use helpers in `src/lib/collection.ts` (`addChildToFolder`, `removeNodeById`, etc.) from `App.tsx` / `components/TreeNodes.tsx`.
+5. **Collections tree:** Root **+ Folder** adds a top-level folder. Folder/request context menus (create, export, rename, delete, import). Mutations use `src/lib/collection.ts` from `App.tsx` / `components/TreeNodes.tsx`.
+6. **Completion scripts** (`src/lib/scriptRunner.ts`): async **`pm` API** — `pm.response.*`, `pm.console.log`, **`pm.environment.set(key, value)`** (updates variables on the request’s environment), **`await pm.sendRequest("folder/sub/request")`** (chains another request, max depth 8). Response panel: **Raw / Pretty** structured body, **Page preview** for HTML (sandboxed, non-interactive iframe).
 
 ---
 
@@ -56,8 +57,8 @@
 src/                      # React + TS UI, Vite client
   api.ts                  # Tauri invoke + browser fallbacks
   App.tsx, App.css        # Root layout
-  components/             # TreeNodes, UpdatePrompt, SecretsDialog
-  lib/                    # variables, collection helpers, scriptRunner, secretPlaceholders
+  components/             # TreeNodes, UpdatePrompt, SecretsDialog, HtmlPreviewModal
+  lib/                    # variables, collection, requestRef, expandForSend, responseFormat, scriptRunner, secretPlaceholders
   types.ts
   *.test.ts(x)            # Vitest co-located tests
 public/                   # Static assets for Vite (e.g. logo.png for favicon + sidebar)
