@@ -20,8 +20,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.set.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        if: github.event_name != 'schedule'
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'src-tauri/**'
+            workflow:
+              - '.github/workflows/**'
+            codeql:
+              - '.github/codeql/**'
+      - id: set
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          R="${{ steps.filter.outputs.rust }}"
+          W="${{ steps.filter.outputs.workflow }}"
+          C="${{ steps.filter.outputs.codeql }}"
+          if [ "$R" = "true" ] || [ "$W" = "true" ] || [ "$C" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
     name: Analyze (Rust)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -65,3 +99,29 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:rust"
+
+  codeql-success:
+    name: CodeQL success
+    needs: [changes, analyze]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: none
+    steps:
+      - name: Verify jobs
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          RUN: ${{ needs.changes.outputs.run }}
+          ANALYZE: ${{ needs.analyze.result }}
+        run: |
+          echo "changes=$CHANGES run=$RUN analyze=$ANALYZE"
+          if [ "$CHANGES" != "success" ]; then
+            echo "changes job did not succeed."
+            exit 1
+          fi
+          if [ "$RUN" = "true" ]; then
+            if [ "$ANALYZE" = "failure" ] || [ "$ANALYZE" = "cancelled" ]; then
+              echo "CodeQL analyze did not succeed."
+              exit 1
+            fi
+          fi
