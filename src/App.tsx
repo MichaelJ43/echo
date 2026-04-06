@@ -36,6 +36,7 @@ import {
   formatResponseBody,
   getContentTypeFromHeaders,
   isLikelyHtmlDocument,
+  selectResponseBodyForView,
 } from "./lib/responseFormat";
 import { runCompletionScript } from "./lib/scriptRunner";
 import { treeNameContainsColon } from "./lib/treeNames";
@@ -103,9 +104,10 @@ export default function App() {
   const [lastResponses, setLastResponses] = useState<
     Record<string, HttpResponsePayload>
   >({});
-  const [responseViewMode, setResponseViewMode] = useState<"raw" | "pretty">(
-    "pretty"
-  );
+  /** Raw vs Pretty preference per request id (session-only). */
+  const [responseViewByRequest, setResponseViewByRequest] = useState<
+    Record<string, "raw" | "pretty">
+  >({});
   const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false);
   const [treeDraft, setTreeDraft] = useState<TreeInlineDraft | null>(null);
   const stateRef = useRef<AppState | null>(null);
@@ -199,6 +201,17 @@ export default function App() {
       }
       return changed ? next : prev;
     });
+    setResponseViewByRequest((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [state?.collections]);
 
   useEffect(() => {
@@ -274,6 +287,11 @@ export default function App() {
     const ct = getContentTypeFromHeaders(response.headers);
     return formatResponseBody(response.body, ct);
   }, [response]);
+
+  const responseViewMode = useMemo((): "raw" | "pretty" => {
+    if (!state?.activeRequestId) return "pretty";
+    return responseViewByRequest[state.activeRequestId] ?? "pretty";
+  }, [state?.activeRequestId, responseViewByRequest]);
 
   const showHtmlPreview =
     response &&
@@ -1200,7 +1218,14 @@ export default function App() {
                   type="button"
                   data-testid="response-view-raw"
                   className={responseViewMode === "raw" ? "active" : ""}
-                  onClick={() => setResponseViewMode("raw")}
+                  onClick={() => {
+                    const id = state?.activeRequestId;
+                    if (!id) return;
+                    setResponseViewByRequest((prev) => ({
+                      ...prev,
+                      [id]: "raw",
+                    }));
+                  }}
                 >
                   Raw
                 </button>
@@ -1208,7 +1233,14 @@ export default function App() {
                   type="button"
                   data-testid="response-view-pretty"
                   className={responseViewMode === "pretty" ? "active" : ""}
-                  onClick={() => setResponseViewMode("pretty")}
+                  onClick={() => {
+                    const id = state?.activeRequestId;
+                    if (!id) return;
+                    setResponseViewByRequest((prev) => ({
+                      ...prev,
+                      [id]: "pretty",
+                    }));
+                  }}
                 >
                   Pretty
                 </button>
@@ -1227,10 +1259,16 @@ export default function App() {
                   </span>
                 ) : null}
               </div>
-              <pre className="response-body" data-testid="response-body">
-                {responseViewMode === "pretty" && formattedResponse
-                  ? formattedResponse.text
-                  : response.body}
+              <pre
+                className="response-body"
+                data-testid="response-body"
+                data-response-view={responseViewMode}
+              >
+                {selectResponseBodyForView(
+                  responseViewMode,
+                  response.body,
+                  formattedResponse
+                )}
               </pre>
             </>
           ) : null}
