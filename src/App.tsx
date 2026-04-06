@@ -466,8 +466,8 @@ export default function App() {
         setScriptLogsByRequest((prev) => {
           const old = prev[req.id] ?? "";
           const label = `[${req.name}]`;
-          const piece = block ? `${label}\n${block}` : "";
-          if (!piece) return prev;
+          const inner = block || "(no output)";
+          const piece = `${label}\n${inner}`;
           /* Prepend so parent completion appears above chained requests */
           const next = old ? `${piece}\n\n${old}` : piece;
           return { ...prev, [req.id]: next };

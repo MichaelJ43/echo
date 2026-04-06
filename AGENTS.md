@@ -69,7 +69,7 @@ src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   tauri.conf.json, Cargo.toml, capabilities/, permissions/
   icons/                  # Generated via npm run icons (see README, scripts/make-icon.mjs)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
-test/e2e/                 # Playwright (smoke / UI against dev server)
+test/e2e/                 # Playwright (smoke, menus/modals, live demo workspace vs httpbin/jsonplaceholder)
 scripts/                  # make-icon.mjs, crop-logo-to-square.py, compose-social-preview.py, run-compose-social.mjs, requirements-images.txt, bump-version.mjs, inject-updater-endpoint.mjs
 docs/                     # design.md (visual system), usage.md, architecture.md, contributors.md, screenshot-main.png (README hero), logo-source.png, github-social-preview.png (generated), github-social-preview-template.png (optional ref export from compose script)
 .github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
@@ -149,7 +149,7 @@ Use this to classify changes in **this** app:
 | `npm run lint` | `tsc -b --noEmit` — TypeScript is the linter (no ESLint in this repo). |
 | `npm run build` | `tsc --noEmit` + `vite build` → `dist/`. |
 | `npm test` | Vitest; jsdom + Testing Library (`src/setupTests.ts`). |
-| `npm run test:e2e` | Playwright; typically needs dev server (`PW_BASE_URL` or default in `test/e2e`). |
+| `npm run test:e2e` | Playwright + Chromium; starts `npm run dev` unless `PLAYWRIGHT_SKIP_WEBSERVER=1`. Includes **live HTTP** tests (`test/e2e/live-demo-workspace.spec.ts`) that seed `examples/echo-feature-demo.workspace.json` via `localStorage` and call **httpbin.org** / **jsonplaceholder.typicode.com**; JSONPlaceholder cases **skip** if `page.request` cannot reach that host (offline/firewall). |
 | `npm run tauri build` | Full desktop bundle (needs `cargo` on PATH and MSVC/WebView2 prerequisites on Windows). |
 | `npm run tauri:build` | `inject-updater-endpoint.mjs` (if `GITHUB_REPOSITORY` is set) + `tauri build` — use for release-style local builds. |
 | `npm run version:bump -- patch` | Bumps semver in `package.json`, `Cargo.toml`, `tauri.conf.json`, refreshes lockfiles (`scripts/bump-version.mjs`). |
