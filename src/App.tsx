@@ -80,7 +80,12 @@ export default function App() {
   const [scriptLogsByRequest, setScriptLogsByRequest] = useState<
     Record<string, string>
   >({});
-  const [error, setError] = useState<string | null>(null);
+  /** Bootstrap failure loading workspace (shown on loading screen only). */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /** Last Send failure or expand error for a given request id (session-only). */
+  const [sendErrorsByRequest, setSendErrorsByRequest] = useState<
+    Record<string, string>
+  >({});
   const [loading, setLoading] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdateRef = useRef<Update | null>(null);
@@ -183,6 +188,17 @@ export default function App() {
       }
       return changed ? next : prev;
     });
+    setSendErrorsByRequest((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [state?.collections]);
 
   useEffect(() => {
@@ -201,7 +217,7 @@ export default function App() {
         setState(next);
         setPaths(p);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setLoadError(e instanceof Error ? e.message : String(e));
       }
     })();
   }, []);
@@ -247,6 +263,11 @@ export default function App() {
     if (!state?.activeRequestId) return "";
     return scriptLogsByRequest[state.activeRequestId] ?? "";
   }, [state?.activeRequestId, scriptLogsByRequest]);
+
+  const activeSendError = useMemo(() => {
+    if (!state?.activeRequestId) return null;
+    return sendErrorsByRequest[state.activeRequestId] ?? null;
+  }, [state?.activeRequestId, sendErrorsByRequest]);
 
   const formattedResponse = useMemo(() => {
     if (!response) return null;
@@ -379,8 +400,14 @@ export default function App() {
 
   const onSend = useCallback(async () => {
     if (!state || !activeRequest || !activeEnv) return;
+    const sendId = activeRequest.id;
     setLoading(true);
-    setError(null);
+    setSendErrorsByRequest((prev) => {
+      if (!(sendId in prev)) return prev;
+      const next = { ...prev };
+      delete next[sendId];
+      return next;
+    });
     const { payload, errors: expandErrors } = buildExpandedSendPayload(
       activeRequest,
       activeEnv,
@@ -388,11 +415,13 @@ export default function App() {
       lastResponses
     );
     if (expandErrors.length) {
-      setError(expandErrors.join("; "));
+      setSendErrorsByRequest((prev) => ({
+        ...prev,
+        [sendId]: expandErrors.join("; "),
+      }));
       setLoading(false);
       return;
     }
-    const sendId = activeRequest.id;
     setPendingSendRequestId(sendId);
     setScriptLogsByRequest((prev) => ({ ...prev, [sendId]: "" }));
     try {
@@ -478,7 +507,8 @@ export default function App() {
         await runScriptChain(activeRequest, res, 0);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setSendErrorsByRequest((prev) => ({ ...prev, [sendId]: msg }));
     } finally {
       setLoading(false);
       setPendingSendRequestId(null);
@@ -743,7 +773,9 @@ export default function App() {
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setInfoToast(
+        `Install failed: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
   }, []);
 
@@ -765,7 +797,7 @@ export default function App() {
     return (
       <div className="request-panel">
         <p data-testid="loading">Loading…</p>
-        {error ? <p className="status-err">{error}</p> : null}
+        {loadError ? <p className="status-err">{loadError}</p> : null}
       </div>
     );
   }
@@ -1149,7 +1181,9 @@ export default function App() {
             ) : (
               <span className="response-meta">No response yet</span>
             )}
-            {error ? <span className="status-err">{error}</span> : null}
+            {activeSendError ? (
+              <span className="status-err">{activeSendError}</span>
+            ) : null}
           </div>
           {activeRequest?.script.trim() ? (
             <div className="script-output-panel">
