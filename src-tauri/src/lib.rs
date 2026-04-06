@@ -66,6 +66,16 @@ fn open_external_url(url: String) -> Result<(), String> {
     open::that(url).map_err(|e| e.to_string())
 }
 
+/// Opens the parent directory of `path` in the system file manager (Explorer, Finder, etc.).
+#[tauri::command]
+fn open_containing_folder(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    let dir = p
+        .parent()
+        .ok_or_else(|| "Path has no parent directory".to_string())?;
+    open::that(dir).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn list_secret_keys(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     secrets::list_secret_keys(&app)
@@ -97,6 +107,7 @@ pub fn run() {
             import_workspace_file,
             export_workspace_file,
             open_external_url,
+            open_containing_folder,
             list_secret_keys,
             set_secret,
             delete_secret

@@ -10,4 +10,5 @@ commands.allow = [
   "write_text_file",
   "import_workspace_file",
   "export_workspace_file",
+  "open_containing_folder",
 ]

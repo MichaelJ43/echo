@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Echo",
-        "width": 1280,
-        "height": 800,
+        "width": 1180,
+        "height": 720,
         "resizable": true,
         "fullscreen": false
       }
