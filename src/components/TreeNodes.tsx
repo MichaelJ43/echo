@@ -24,7 +24,7 @@ type Props = {
   onDraftCancel: () => void;
   onSelectRequest: (id: string) => void;
   onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
-  onImport: () => void | Promise<void>;
+  onImportUnderFolder: (folderId: string) => void | Promise<void>;
   onRenameFolder: (folderId: string, folderName: string) => void;
   onExportRequest: (requestId: string, requestName: string) => void | Promise<void>;
   onRenameRequest: (requestId: string, requestName: string) => void;
@@ -47,7 +47,7 @@ export function TreeNodes({
   onDraftCancel,
   onSelectRequest,
   onExportFolder,
-  onImport,
+  onImportUnderFolder,
   onRenameFolder,
   onExportRequest,
   onRenameRequest,
@@ -73,7 +73,7 @@ export function TreeNodes({
           onDraftCancel={onDraftCancel}
           onSelectRequest={onSelectRequest}
           onExportFolder={onExportFolder}
-          onImport={onImport}
+          onImportUnderFolder={onImportUnderFolder}
           onRenameFolder={onRenameFolder}
           onExportRequest={onExportRequest}
           onRenameRequest={onRenameRequest}
@@ -100,7 +100,7 @@ function TreeNode({
   onDraftCancel,
   onSelectRequest,
   onExportFolder,
-  onImport,
+  onImportUnderFolder,
   onRenameFolder,
   onExportRequest,
   onRenameRequest,
@@ -121,7 +121,7 @@ function TreeNode({
   onDraftCancel: () => void;
   onSelectRequest: (id: string) => void;
   onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
-  onImport: () => void | Promise<void>;
+  onImportUnderFolder: (folderId: string) => void | Promise<void>;
   onRenameFolder: (folderId: string, folderName: string) => void;
   onExportRequest: (requestId: string, requestName: string) => void | Promise<void>;
   onRenameRequest: (requestId: string, requestName: string) => void;
@@ -275,7 +275,7 @@ function TreeNode({
               data-testid="import-workspace"
               onClick={() => {
                 setTreeMenu(null);
-                void onImport();
+                void onImportUnderFolder(node.id);
               }}
             >
               Import workspace
@@ -320,7 +320,7 @@ function TreeNode({
               onDraftCancel={onDraftCancel}
               onSelectRequest={onSelectRequest}
               onExportFolder={onExportFolder}
-              onImport={onImport}
+              onImportUnderFolder={onImportUnderFolder}
               onRenameFolder={onRenameFolder}
               onExportRequest={onExportRequest}
               onRenameRequest={onRenameRequest}

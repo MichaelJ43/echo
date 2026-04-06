@@ -78,6 +78,7 @@ Keep new layouts **aligned to these multiples** (4 / 6 / 8 / 12) unless there is
 - **Inputs and selects:** `--bg` or `--bg-elevated` fill, `--border`, **4px** radius, inherited text color.
 - **Secondary buttons:** bordered, `--bg`-ish fill, hover **light white overlay** (`rgba(255,255,255,0.06)`).
 - **Context menus:** fixed position, `--bg-elevated`, **6px** radius, soft shadow; items **4px** radius, full width.
+- **Confirm / destructive modals:** reuse `secrets-dialog-backdrop` + `about-dialog` shell; pair **Cancel** (secondary bordered) with a destructive action (e.g. **Choose file and replace…**) using `--danger` tint (see `.import-confirm-dialog-btn-danger` in `App.css`).
 - **Inline tree editor** (`TreeInlineNameRow`): same input styling as the rest of the app; confirm control uses **success**-tinted green on hover; colon errors use **`.tree-inline-colon-err`** (`--danger`, small type).
 
 ---
