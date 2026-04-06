@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEventHandler,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import type { CollectionNode } from "../types";
 import type { TreeInlineDraft } from "../lib/treeDraft";
 import { TreeInlineNameRow } from "./TreeInlineNameRow";
@@ -232,11 +242,10 @@ function TreeNode({
           )}
         </div>
         {showFolderMenu ? (
-          <div
-            className="context-menu"
-            style={{ left: treeMenu.x, top: treeMenu.y }}
-            data-testid="folder-context-menu"
-            role="menu"
+          <PositionedContextMenu
+            anchorX={treeMenu.x}
+            anchorY={treeMenu.y}
+            testId="folder-context-menu"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -303,7 +312,7 @@ function TreeNode({
             >
               Delete folder
             </button>
-          </div>
+          </PositionedContextMenu>
         ) : null}
         {expanded ? (
           <>
@@ -389,11 +398,10 @@ function TreeNode({
         )}
       </div>
       {showRequestMenu ? (
-        <div
-          className="context-menu"
-          style={{ left: treeMenu.x, top: treeMenu.y }}
-          data-testid="request-context-menu"
-          role="menu"
+        <PositionedContextMenu
+          anchorX={treeMenu.x}
+          anchorY={treeMenu.y}
+          testId="request-context-menu"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -428,8 +436,58 @@ function TreeNode({
           >
             Delete request
           </button>
-        </div>
+        </PositionedContextMenu>
       ) : null}
     </>
+  );
+}
+
+function PositionedContextMenu({
+  anchorX,
+  anchorY,
+  testId,
+  onClick,
+  children,
+}: {
+  anchorX: number;
+  anchorY: number;
+  testId: string;
+  onClick: MouseEventHandler<HTMLDivElement>;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>(() => ({
+    left: anchorX,
+    top: anchorY,
+  }));
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const pad = 8;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    let left = anchorX;
+    let top = anchorY;
+    if (top + h > window.innerHeight - pad) top = anchorY - h;
+    if (top < pad) top = pad;
+    if (left + w > window.innerWidth - pad) left = window.innerWidth - w - pad;
+    if (left < pad) left = pad;
+    setStyle((prev) =>
+      prev.left === left && prev.top === top ? prev : { left, top }
+    );
+  }, [anchorX, anchorY]);
+
+  return (
+    <div
+      ref={ref}
+      className="context-menu"
+      style={style}
+      data-testid={testId}
+      role="menu"
+      onClick={onClick}
+    >
+      {children}
+    </div>
   );
 }
