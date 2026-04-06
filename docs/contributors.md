@@ -5,6 +5,7 @@ Thanks for helping improve Echo. This doc is for **developers** who want to add 
 ## What to read first
 
 - **[AGENTS.md](../AGENTS.md)** — canonical overview: stack, entrypoints, IPC, persistence, semver, CI, and repo conventions. **Read it before larger changes** so your work matches how the project is structured.
+- **[docs/design.md](design.md)** — visual theme, `:root` color tokens (`src/App.css`), layout, typography, and UI patterns. **Read before changing styles or adding screens** so new UI stays consistent.
 - **[docs/architecture.md](architecture.md)** — higher-level module and data-flow notes (if present).
 
 ## Workflow
@@ -19,7 +20,7 @@ Prefixes that match the work: `feat/`, `fix/`, `chore/`, `docs/`.
 
 | Layer | Location | Typical changes |
 |-------|----------|------------------|
-| UI | `src/` (React + TypeScript), `App.tsx`, `components/` | Screens, forms, tree, dialogs |
+| UI | `src/` (React + TypeScript), `App.tsx`, `components/`, [`App.css`](../src/App.css) | Screens, forms, tree, dialogs; follow **[design.md](design.md)** for tokens and spacing |
 | Browser vs desktop API | `src/api.ts` | `invoke` when running in Tauri; fallbacks for plain `npm run dev` |
 | Backend / IPC | `src-tauri/src/lib.rs`, command handlers | New `#[tauri::command]` or changed payloads |
 | HTTP execution | `src-tauri/src/http_client.rs` | Headers, body, TLS, substitution, secrets |

@@ -4,6 +4,8 @@
 
 Echo lets you organize API requests in **collections** (folders) on the left. Selecting a request loads it in the main area. **Send** runs the request; the response appears in the panel below.
 
+The interface is **dark-themed**, with the collection tree in a **sidebar** and the request editor and response in the **main area**. For a developer-oriented description of colors, typography, and layout (including CSS variables), see **[docs/design.md](design.md)**.
+
 ## Workspace storage
 
 On the **desktop app** (Tauri), your workspace is saved automatically to a JSON file in the application data directory:
