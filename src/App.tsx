@@ -37,6 +37,7 @@ import {
   isLikelyHtmlDocument,
 } from "./lib/responseFormat";
 import { runCompletionScript } from "./lib/scriptRunner";
+import { TREE_NAME_COLON_ERROR, treeNameContainsColon } from "./lib/treeNames";
 import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
 import { AboutDialog } from "./components/AboutDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
@@ -364,6 +365,10 @@ export default function App() {
     const name = window.prompt("Folder name", currentName);
     if (name === null) return;
     const trimmed = name.trim() || currentName;
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       return {
@@ -377,6 +382,10 @@ export default function App() {
     const name = window.prompt("Request name", currentName);
     if (name === null) return;
     const trimmed = name.trim() || currentName;
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       return {
@@ -408,6 +417,10 @@ export default function App() {
     const name = window.prompt("Folder name", "My folder");
     if (name === null) return;
     const trimmed = name.trim() || "My folder";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const folder = createFolderNode(trimmed);
@@ -422,6 +435,10 @@ export default function App() {
     const name = window.prompt("Folder name", "New folder");
     if (name === null) return;
     const trimmed = name.trim() || "New folder";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const child = createFolderNode(trimmed);
@@ -436,6 +453,10 @@ export default function App() {
     const name = window.prompt("Request name", "New request");
     if (name === null) return;
     const trimmed = name.trim() || "New request";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const envId = prev.environments[0]?.id;
