@@ -259,21 +259,26 @@ export default function App() {
     setHtmlPreviewOpen(false);
   }, [state?.activeRequestId]);
 
+  /** Keep every folder on the path to the active request expanded (re-runs when user collapses an ancestor). */
   useEffect(() => {
     if (!state?.activeRequestId) return;
     const ancestors = findAncestorFolderIdsForRequest(
       state.collections,
       state.activeRequestId
     );
-    if (!ancestors) return;
+    if (!ancestors?.length) return;
     setCollapsedFolderIds((prev) => {
       const next = { ...prev };
+      let changed = false;
       for (const id of ancestors) {
-        delete next[id];
+        if (next[id]) {
+          delete next[id];
+          changed = true;
+        }
       }
-      return next;
+      return changed ? next : prev;
     });
-  }, [state?.activeRequestId, state?.collections]);
+  }, [state?.activeRequestId, state?.collections, collapsedFolderIds]);
 
   useLayoutEffect(() => {
     if (!state?.activeRequestId) return;

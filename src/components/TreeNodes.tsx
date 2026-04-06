@@ -590,6 +590,20 @@ function TreeNode({
           ctx?.setDraggingId(null);
           ctx?.setDropTarget(null);
         }}
+        onDragOver={(e: DragEvent) => {
+          if (!ctx || !isOurTreeDrag(ctx, e)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.dataTransfer.getData("text/plain");
+          ctx?.setDropTarget(null);
+          ctx?.setDraggingId(null);
+          if (!id) return;
+          onMoveNode(id, { parentId: _parentFolderId, index: _indexInParent });
+        }}
         onClick={() => onSelectRequest(node.id)}
         onContextMenu={onCtxRequest}
         data-testid={`request-${node.id}`}
