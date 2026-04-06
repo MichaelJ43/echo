@@ -85,6 +85,19 @@ export function formatResponseBody(
   return { kind: "text", text: body };
 }
 
+/**
+ * Response panel: Raw shows the exact body from the HTTP response; Pretty uses
+ * {@link formatResponseBody} when available.
+ */
+export function selectResponseBodyForView(
+  mode: "raw" | "pretty",
+  body: string,
+  formatted: FormattedBody | null
+): string {
+  if (mode === "raw") return body;
+  return formatted?.text ?? body;
+}
+
 /** Whether the body is likely an HTML document worth previewing in a sandboxed iframe. */
 export function isLikelyHtmlDocument(
   body: string,

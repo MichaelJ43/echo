@@ -3,6 +3,7 @@ import {
   formatResponseBody,
   getContentTypeFromHeaders,
   isLikelyHtmlDocument,
+  selectResponseBodyForView,
 } from "./responseFormat";
 
 describe("responseFormat", () => {
@@ -25,5 +26,17 @@ describe("responseFormat", () => {
       ["Content-Type", "application/json; charset=utf-8"],
     ];
     expect(getContentTypeFromHeaders(h)).toBe("application/json");
+  });
+
+  it("selectResponseBodyForView raw returns exact body", () => {
+    const formatted = formatResponseBody('{"a":1}', "application/json");
+    expect(selectResponseBodyForView("raw", '{"a":1}', formatted)).toBe('{"a":1}');
+  });
+
+  it("selectResponseBodyForView pretty uses formatted text", () => {
+    const formatted = formatResponseBody('{"a":1}', "application/json");
+    expect(selectResponseBodyForView("pretty", '{"a":1}', formatted)).toBe(
+      formatted.text
+    );
   });
 });
