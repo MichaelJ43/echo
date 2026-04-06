@@ -19,6 +19,7 @@
     "version:bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
+    "js-yaml": "^4.1.0",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-process": "^2.2.0",
@@ -27,10 +28,11 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.2.0",
     "@playwright/test": "^1.49.0",
+    "@tauri-apps/cli": "^2.2.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

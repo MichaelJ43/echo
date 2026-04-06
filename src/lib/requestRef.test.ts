@@ -4,6 +4,8 @@ import {
   expandRequestReferences,
   findRequestByPath,
   getValueAtJsonPath,
+  parseStructuredBody,
+  splitRequestRefInner,
 } from "./requestRef";
 
 const tree: CollectionNode[] = [
@@ -65,5 +67,59 @@ describe("requestRef", () => {
     );
     expect(errors).toHaveLength(0);
     expect(text).toBe("Bearer abc123");
+  });
+
+  it("expandRequestReferences inserts full body when no value path", () => {
+    const cache: Record<string, HttpResponsePayload | undefined> = {
+      r1: {
+        status: 200,
+        statusText: "OK",
+        headers: [],
+        body: "plain text body",
+        durationMs: 1,
+      },
+    };
+    const { text, errors } = expandRequestReferences(
+      "X={{request:folder1/folder2/get_request}}",
+      tree,
+      cache
+    );
+    expect(errors).toHaveLength(0);
+    expect(text).toBe("X=plain text body");
+  });
+
+  it("expandRequestReferences parses YAML for dot path", () => {
+    const cache: Record<string, HttpResponsePayload | undefined> = {
+      r1: {
+        status: 200,
+        statusText: "OK",
+        headers: [],
+        body: "auth:\n  token: yaml-token\n",
+        durationMs: 1,
+      },
+    };
+    const { text, errors } = expandRequestReferences(
+      "{{request:folder1/folder2/get_request:auth.token}}",
+      tree,
+      cache
+    );
+    expect(errors).toHaveLength(0);
+    expect(text).toBe("yaml-token");
+  });
+
+  it("parseStructuredBody reads YAML mapping", () => {
+    const v = parseStructuredBody("a: 1\nb: two\n");
+    expect(v).toEqual({ a: 1, b: "two" });
+  });
+
+  it("splitRequestRefInner treats last colon as value path", () => {
+    expect(splitRequestRefInner("a/b/c")).toEqual({
+      pathPart: "a/b/c",
+      valuePath: null,
+    });
+    expect(splitRequestRefInner("a/b/c:auth.key")).toEqual({
+      pathPart: "a/b/c",
+      valuePath: "auth.key",
+    });
   });
 });

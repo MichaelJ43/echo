@@ -1,3 +1,4 @@
+import yaml from "js-yaml";
 import type { CollectionNode, HttpResponsePayload, RequestItem } from "../types";
 
 /** Walk folder/request names, e.g. `folder1/sub/my_request`. */
@@ -30,7 +31,7 @@ function walk(nodes: CollectionNode[], segments: string[]): RequestItem | null {
   return null;
 }
 
-/** Dot/bracket path for JSON objects, e.g. `auth.bearer` or `items.0.id`. */
+/** Dot path for objects/arrays, e.g. `auth.bearer` or `items.0.id`. */
 export function getValueAtJsonPath(data: unknown, path: string): unknown {
   const parts = path.split(".").filter(Boolean);
   let cur: unknown = data;
@@ -53,11 +54,52 @@ export function valueToSubstitutionString(val: unknown): string {
   return JSON.stringify(val);
 }
 
+/**
+ * Try JSON first, then YAML (`js-yaml`). Plain text returns `null` (not structured).
+ */
+export function parseStructuredBody(body: string): unknown | null {
+  const t = body.trim();
+  if (!t) return "";
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    try {
+      return yaml.load(body) as unknown;
+    } catch {
+      return null;
+    }
+  }
+}
+
 const REQUEST_REF_RE = /\{\{request:([^}]+)\}\}/g;
 
 /**
- * Inline `{{request:folder/sub/requestName:json.dot.path}}` using cached JSON bodies.
- * Path uses `/` between folder names and the request name; `json.dot.path` indexes the parsed body.
+ * Split `folder/sub/name` vs `folder/sub/name:dot.path` using the **last** `:`.
+ * If there is no `:`, the whole inner string is the tree path (entire body substitution).
+ */
+export function splitRequestRefInner(inner: string): {
+  pathPart: string;
+  valuePath: string | null;
+} {
+  const trimmed = inner.trim();
+  const lastColon = trimmed.lastIndexOf(":");
+  if (lastColon === -1) {
+    return { pathPart: trimmed, valuePath: null };
+  }
+  const pathPart = trimmed.slice(0, lastColon).trim();
+  const rest = trimmed.slice(lastColon + 1).trim();
+  if (!pathPart) {
+    return { pathPart: trimmed, valuePath: null };
+  }
+  if (!rest) {
+    return { pathPart, valuePath: null };
+  }
+  return { pathPart, valuePath: rest };
+}
+
+/**
+ * Inline `{{request:folder/sub/requestName}}` (entire body) or
+ * `{{request:folder/sub/requestName:json.dot.path}}` (value from JSON or YAML body).
  */
 export function expandRequestReferences(
   input: string,
@@ -66,14 +108,8 @@ export function expandRequestReferences(
 ): { text: string; errors: string[] } {
   const errors: string[] = [];
   const text = input.replace(REQUEST_REF_RE, (full, inner: string) => {
-    const idx = inner.lastIndexOf(":");
-    if (idx <= 0) {
-      errors.push(`Invalid request reference: ${full}`);
-      return "";
-    }
-    const pathPart = inner.slice(0, idx).trim();
-    const jsonPath = inner.slice(idx + 1).trim();
-    if (!pathPart || !jsonPath) {
+    const { pathPart, valuePath } = splitRequestRefInner(inner);
+    if (!pathPart) {
       errors.push(`Invalid request reference: ${full}`);
       return "";
     }
@@ -89,20 +125,26 @@ export function expandRequestReferences(
       );
       return "";
     }
-    try {
-      const data = JSON.parse(res.body) as unknown;
-      const val = getValueAtJsonPath(data, jsonPath);
-      if (val === undefined) {
-        errors.push(
-          `Path "${jsonPath}" not found in JSON response for "${pathPart}"`
-        );
-        return "";
-      }
-      return valueToSubstitutionString(val);
-    } catch {
-      errors.push(`Response body for "${pathPart}" is not valid JSON`);
+
+    if (valuePath === null) {
+      return res.body;
+    }
+
+    const parsed = parseStructuredBody(res.body);
+    if (parsed === null) {
+      errors.push(
+        `Response for "${pathPart}" is not valid JSON or YAML (need structured body to use :path)`
+      );
       return "";
     }
+    const val = getValueAtJsonPath(parsed, valuePath);
+    if (val === undefined) {
+      errors.push(
+        `Path "${valuePath}" not found in response for "${pathPart}"`
+      );
+      return "";
+    }
+    return valueToSubstitutionString(val);
   });
   return { text, errors };
 }
