@@ -13,6 +13,7 @@ import {
 } from "./api";
 import {
   addChildToFolder,
+  allRequestIds,
   appendRootFolder,
   createFolderNode,
   createRequestItem,
@@ -72,8 +73,13 @@ const SCRIPT_CHAIN_MAX = 8;
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [paths, setPaths] = useState<{ appDataDir: string; collectionsFile: string } | null>(null);
-  const [response, setResponse] = useState<HttpResponsePayload | null>(null);
-  const [scriptLog, setScriptLog] = useState<string>("");
+  /** In-flight send for this request id — hide cached response until the round-trip finishes. */
+  const [pendingSendRequestId, setPendingSendRequestId] = useState<string | null>(
+    null
+  );
+  const [scriptLogsByRequest, setScriptLogsByRequest] = useState<
+    Record<string, string>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,6 +159,37 @@ export default function App() {
   }, [lastResponses]);
 
   useEffect(() => {
+    if (!state) return;
+    const valid = allRequestIds(state.collections);
+    setLastResponses((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    setScriptLogsByRequest((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [state?.collections]);
+
+  useEffect(() => {
+    setHtmlPreviewOpen(false);
+  }, [state?.activeRequestId]);
+
+  useEffect(() => {
     void (async () => {
       try {
         const [s, p] = await Promise.all([loadState(), getPaths()]);
@@ -194,6 +231,22 @@ export default function App() {
       state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null
     );
   }, [state, activeRequest]);
+
+  const response: HttpResponsePayload | null = useMemo(() => {
+    if (!state?.activeRequestId) return null;
+    if (loading && pendingSendRequestId === state.activeRequestId) return null;
+    return lastResponses[state.activeRequestId] ?? null;
+  }, [
+    state?.activeRequestId,
+    loading,
+    pendingSendRequestId,
+    lastResponses,
+  ]);
+
+  const scriptLog = useMemo(() => {
+    if (!state?.activeRequestId) return "";
+    return scriptLogsByRequest[state.activeRequestId] ?? "";
+  }, [state?.activeRequestId, scriptLogsByRequest]);
 
   const formattedResponse = useMemo(() => {
     if (!response) return null;
@@ -328,8 +381,6 @@ export default function App() {
     if (!state || !activeRequest || !activeEnv) return;
     setLoading(true);
     setError(null);
-    setResponse(null);
-    setScriptLog("");
     const { payload, errors: expandErrors } = buildExpandedSendPayload(
       activeRequest,
       activeEnv,
@@ -341,11 +392,13 @@ export default function App() {
       setLoading(false);
       return;
     }
+    const sendId = activeRequest.id;
+    setPendingSendRequestId(sendId);
+    setScriptLogsByRequest((prev) => ({ ...prev, [sendId]: "" }));
     try {
       const res = await sendHttpRequest(payload);
-      setResponse(res);
       setLastResponses((prev) => {
-        const next = { ...prev, [activeRequest.id]: res };
+        const next = { ...prev, [sendId]: res };
         lastResponsesRef.current = next;
         return next;
       });
@@ -356,9 +409,12 @@ export default function App() {
         depth: number
       ): Promise<void> => {
         if (depth > SCRIPT_CHAIN_MAX) {
-          setScriptLog((prev) =>
-            `${prev}\nMax completion script / sendRequest depth (${SCRIPT_CHAIN_MAX})`.trim()
-          );
+          setScriptLogsByRequest((prev) => {
+            const msg = `Max completion script / sendRequest depth (${SCRIPT_CHAIN_MAX})`;
+            const old = prev[req.id] ?? "";
+            const next = old ? `${old}\n${msg}` : msg;
+            return { ...prev, [req.id]: next };
+          });
           return;
         }
         if (!req.script.trim()) return;
@@ -407,12 +463,14 @@ export default function App() {
         block = [...out.logs, out.error ? `Script error: ${out.error}` : ""]
           .filter(Boolean)
           .join("\n");
-        setScriptLog((prev) => {
+        setScriptLogsByRequest((prev) => {
+          const old = prev[req.id] ?? "";
           const label = `[${req.name}]`;
           const piece = block ? `${label}\n${block}` : "";
           if (!piece) return prev;
           /* Prepend so parent completion appears above chained requests */
-          return prev ? `${piece}\n\n${prev}` : piece;
+          const next = old ? `${piece}\n\n${old}` : piece;
+          return { ...prev, [req.id]: next };
         });
       };
 
@@ -423,6 +481,7 @@ export default function App() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setPendingSendRequestId(null);
     }
   }, [state, activeRequest, activeEnv, lastResponses]);
 
