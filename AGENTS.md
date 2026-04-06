@@ -10,6 +10,7 @@
 - **License:** MIT — see **`LICENSE`** at repo root (`package.json` and `src-tauri/Cargo.toml` declare `MIT`).
 - **Security:** **`SECURITY.md`** — vulnerability reporting and notes on dependency advisories constrained by upstream (e.g. Tauri’s Linux `glib` stack).
 - **Purpose:** Desktop **API client** (Postman-style): HTTP requests, collections tree, environments and `{{variables}}`, auth, response panel, optional completion scripts (`pm.*` shim). **Not** a trading or market app.
+- **Visual design:** Dark, compact, tool-like UI. **Canonical spec:** **`docs/design.md`**. **Implementation:** `src/App.css` (`:root` CSS variables and shared classes). Agents must **reuse existing tokens** (`--bg`, `--accent`, `--danger`, etc.) for new UI; extend `App.css` consistently. Update **`docs/design.md`** and this file when you add or change global design rules.
 - **Stack:** **Tauri 2** native shell, **Rust** backend (`src-tauri/`) for IPC commands, persistence, and HTTP via **reqwest**; **React 19** + **TypeScript** + **Vite** frontend (`src/`). Plain `npm run dev` runs the web UI only (localStorage + `fetch` fallbacks in `src/api.ts`); **`npm run tauri dev`** is the full desktop app.
 
 ---
@@ -70,7 +71,7 @@ src-tauri/                # Rust crate + Tauri config (required layout for CLI)
   windows/                # NSIS `installerHooks` (.nsh) for the Windows `.exe` bundle
 test/e2e/                 # Playwright (smoke / UI against dev server)
 scripts/                  # make-icon.mjs, crop-logo-to-square.py, compose-social-preview.py, run-compose-social.mjs, requirements-images.txt, bump-version.mjs, inject-updater-endpoint.mjs
-docs/                     # usage.md, architecture.md, contributors.md, logo-source.png, github-social-preview.png (generated), github-social-preview-template.png (optional ref export from compose script)
+docs/                     # design.md (visual system), usage.md, architecture.md, contributors.md, screenshot-main.png (README hero), logo-source.png, github-social-preview.png (generated), github-social-preview-template.png (optional ref export from compose script)
 .github/workflows/        # ci.yml, codeql.yml, release.yml, version-bump.yml
 .github/ISSUE_TEMPLATE/     # bug_report.yml, feature_request.yml, config.yml (GitHub issue forms)
 .github/pull_request_template.md  # default PR body scaffold
@@ -80,6 +81,12 @@ CONTRIBUTING.md             # entry point → docs/contributors.md, security, Co
 ```
 
 **Imports:** ESM (`"type": "module"`). No `@/` path alias unless added to `tsconfig` / Vite—prefer relative imports matching existing files.
+
+### 4b. Visual design system (UI)
+
+- **Authoritative doc:** **`docs/design.md`** — theme intent, color tokens, typography, spacing, layout (sidebar width, sections), and component patterns.
+- **Code:** **`src/App.css`** defines `:root` variables and most layout/component styles; new surfaces should **use those variables** rather than one-off colors.
+- **Maintenance:** Changes that alter the **global palette, spacing scale, or shell layout** must update **`docs/design.md`** and **§1 (Visual design)** above in the **same PR**.
 
 ---
 
@@ -182,6 +189,6 @@ Use this to classify changes in **this** app:
 
 ## 9. Meta
 
-- **Single onboarding file:** New agents should read **this file first**, then `README.md` / `docs/usage.md`, then targeted source files.
+- **Single onboarding file:** New agents should read **this file first**, then `README.md` / `docs/usage.md`, **`docs/design.md`** if touching UI, then targeted source files.
 - **Cursor:** `.cursor/rules/agents-md-first.mdc` (`alwaysApply: true`) instructs reading this file before substantive work and commands. `.cursor/rules/ship-it.mdc` defines the **ship it** flow: **SemVer classification** (§5b), branch from `main`, push, `gh pr create` (body includes recommended bump), watch checks, fix failures.
 - **Stale content:** If this file drifts from the repo, update it—stale `AGENTS.md` is a bug.
