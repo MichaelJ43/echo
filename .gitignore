@@ -10,3 +10,4 @@ test-results
 # Tauri updater signing: never commit the private key. Public key lives in tauri.conf.json only.
 src-tauri/*.key
 src-tauri/*.key.pub
+todo.txt

@@ -190,5 +190,5 @@ Use this to classify changes in **this** app:
 ## 9. Meta
 
 - **Single onboarding file:** New agents should read **this file first**, then `README.md` / `docs/usage.md`, **`docs/design.md`** if touching UI, then targeted source files.
-- **Cursor:** `.cursor/rules/agents-md-first.mdc` (`alwaysApply: true`) instructs reading this file before substantive work and commands. `.cursor/rules/ship-it.mdc` defines the **ship it** flow: **SemVer classification** (§5b), branch from `main`, push, `gh pr create` (body includes recommended bump), watch checks, fix failures.
+- **Cursor:** `.cursor/rules/agents-md-first.mdc` (`alwaysApply: true`) instructs reading this file before substantive work and commands. `.cursor/rules/token-guardrails.mdc` (`alwaysApply: true`) constrains planning, blast radius, and directory-scoped context gathering. `.cursor/rules/ship-it.mdc` defines the **ship it** flow: **SemVer classification** (§5b), branch from `main`, push, `gh pr create` (body includes recommended bump), watch checks, fix failures.
 - **Stale content:** If this file drifts from the repo, update it—stale `AGENTS.md` is a bug.
