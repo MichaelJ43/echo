@@ -29,10 +29,18 @@ import {
   sliceWorkspaceForFolderExport,
   sliceWorkspaceForRequestExport,
 } from "./lib/workspaceSlice";
+import { buildExpandedSendPayload } from "./lib/expandForSend";
+import { findRequestByPath } from "./lib/requestRef";
+import {
+  formatResponseBody,
+  getContentTypeFromHeaders,
+  isLikelyHtmlDocument,
+} from "./lib/responseFormat";
 import { runCompletionScript } from "./lib/scriptRunner";
-import { variablesToMap } from "./lib/variables";
+import { TREE_NAME_COLON_ERROR, treeNameContainsColon } from "./lib/treeNames";
 import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
 import { AboutDialog } from "./components/AboutDialog";
+import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeNodes, type TreeMenuState } from "./components/TreeNodes";
 import { UpdatePrompt } from "./components/UpdatePrompt";
@@ -54,6 +62,8 @@ const METHODS = [
   "OPTIONS",
 ];
 
+const SCRIPT_CHAIN_MAX = 8;
+
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [paths, setPaths] = useState<{ appDataDir: string; collectionsFile: string } | null>(null);
@@ -74,6 +84,15 @@ export default function App() {
   );
   const [secretsOpen, setSecretsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [lastResponses, setLastResponses] = useState<
+    Record<string, HttpResponsePayload>
+  >({});
+  const [responseViewMode, setResponseViewMode] = useState<"raw" | "pretty">(
+    "pretty"
+  );
+  const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false);
+  const stateRef = useRef<AppState | null>(null);
+  const lastResponsesRef = useRef<Record<string, HttpResponsePayload>>({});
 
   useEffect(() => {
     const scheduler = startUpdateCheckScheduler((u) => {
@@ -120,6 +139,14 @@ export default function App() {
   }, [infoToast]);
 
   useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    lastResponsesRef.current = lastResponses;
+  }, [lastResponses]);
+
+  useEffect(() => {
     void (async () => {
       try {
         const [s, p] = await Promise.all([loadState(), getPaths()]);
@@ -162,6 +189,19 @@ export default function App() {
     );
   }, [state, activeRequest]);
 
+  const formattedResponse = useMemo(() => {
+    if (!response) return null;
+    const ct = getContentTypeFromHeaders(response.headers);
+    return formatResponseBody(response.body, ct);
+  }, [response]);
+
+  const showHtmlPreview =
+    response &&
+    isLikelyHtmlDocument(
+      response.body,
+      getContentTypeFromHeaders(response.headers)
+    );
+
   const updateActiveRequest = useCallback(
     (fn: (r: RequestItem) => RequestItem) => {
       if (!state?.activeRequestId) return;
@@ -183,33 +223,101 @@ export default function App() {
     setError(null);
     setResponse(null);
     setScriptLog("");
+    const { payload, errors: expandErrors } = buildExpandedSendPayload(
+      activeRequest,
+      activeEnv,
+      state.collections,
+      lastResponses
+    );
+    if (expandErrors.length) {
+      setError(expandErrors.join("; "));
+      setLoading(false);
+      return;
+    }
     try {
-      const variables = variablesToMap(activeEnv.variables);
-      const res = await sendHttpRequest({
-        method: activeRequest.method,
-        url: activeRequest.url,
-        headers: activeRequest.headers,
-        queryParams: activeRequest.queryParams,
-        body: activeRequest.body,
-        bodyType: activeRequest.bodyType,
-        auth: activeRequest.auth,
-        variables,
-      });
+      const res = await sendHttpRequest(payload);
       setResponse(res);
+      setLastResponses((prev) => {
+        const next = { ...prev, [activeRequest.id]: res };
+        lastResponsesRef.current = next;
+        return next;
+      });
+
+      const runScriptChain = async (
+        req: RequestItem,
+        resPayload: HttpResponsePayload,
+        depth: number
+      ): Promise<void> => {
+        if (depth > SCRIPT_CHAIN_MAX) {
+          setScriptLog((prev) =>
+            `${prev}\nMax completion script / sendRequest depth (${SCRIPT_CHAIN_MAX})`.trim()
+          );
+          return;
+        }
+        if (!req.script.trim()) return;
+
+        let block = "";
+        const out = await runCompletionScript(req.script, resPayload, {
+          setEnvironmentVariable: (key, value) => {
+            setState((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                environments: prev.environments.map((env) => {
+                  if (env.id !== req.environmentId) return env;
+                  const vars = [...env.variables];
+                  const ix = vars.findIndex((v) => v.key === key);
+                  if (ix >= 0) vars[ix] = { ...vars[ix], value, enabled: true };
+                  else vars.push({ key, value, enabled: true });
+                  return { ...env, variables: vars };
+                }),
+              };
+            });
+          },
+          sendRequest: async (path) => {
+            const s = stateRef.current;
+            if (!s) throw new Error("App state unavailable");
+            const target = findRequestByPath(s.collections, path);
+            if (!target) throw new Error(`No request at path: ${path}`);
+            const env = s.environments.find((e) => e.id === target.environmentId);
+            if (!env) throw new Error("Environment not found for request");
+            const built = buildExpandedSendPayload(
+              target,
+              env,
+              s.collections,
+              lastResponsesRef.current
+            );
+            if (built.errors.length) throw new Error(built.errors.join("; "));
+            const r2 = await sendHttpRequest(built.payload);
+            setLastResponses((prev) => {
+              const n = { ...prev, [target.id]: r2 };
+              lastResponsesRef.current = n;
+              return n;
+            });
+            await runScriptChain(target, r2, depth + 1);
+          },
+        });
+        block = [...out.logs, out.error ? `Script error: ${out.error}` : ""]
+          .filter(Boolean)
+          .join("\n");
+        setScriptLog((prev) => {
+          const label = `[${req.name}]`;
+          const piece = block ? `${label}\n${block}` : "";
+          if (!piece) return prev;
+          /* Prepend so parent completion appears above chained requests */
+          return prev ? `${piece}\n\n${prev}` : piece;
+        });
+      };
+
       if (activeRequest.script.trim()) {
-        const out = runCompletionScript(activeRequest.script, res);
-        setScriptLog(
-          [...out.logs, out.error ? `Script error: ${out.error}` : ""]
-            .filter(Boolean)
-            .join("\n")
-        );
+        await runScriptChain(activeRequest, res, 0);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [state, activeRequest, activeEnv]);
+  }, [state, activeRequest, activeEnv, lastResponses]);
 
   const onExportWorkspace = useCallback(async () => {
     if (!state) return;
@@ -257,6 +365,10 @@ export default function App() {
     const name = window.prompt("Folder name", currentName);
     if (name === null) return;
     const trimmed = name.trim() || currentName;
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       return {
@@ -270,6 +382,10 @@ export default function App() {
     const name = window.prompt("Request name", currentName);
     if (name === null) return;
     const trimmed = name.trim() || currentName;
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       return {
@@ -301,6 +417,10 @@ export default function App() {
     const name = window.prompt("Folder name", "My folder");
     if (name === null) return;
     const trimmed = name.trim() || "My folder";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const folder = createFolderNode(trimmed);
@@ -315,6 +435,10 @@ export default function App() {
     const name = window.prompt("Folder name", "New folder");
     if (name === null) return;
     const trimmed = name.trim() || "New folder";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const child = createFolderNode(trimmed);
@@ -329,6 +453,10 @@ export default function App() {
     const name = window.prompt("Request name", "New request");
     if (name === null) return;
     const trimmed = name.trim() || "New request";
+    if (treeNameContainsColon(trimmed)) {
+      window.alert(TREE_NAME_COLON_ERROR);
+      return;
+    }
     setState((prev) => {
       if (!prev) return prev;
       const envId = prev.environments[0]?.id;
@@ -861,8 +989,10 @@ export default function App() {
               <div className="section">
                 <h3>Completion script</h3>
                 <p className="response-meta" style={{ marginTop: 0 }}>
-                  Use <code>pm.response.status()</code>, <code>pm.response.text()</code>,{" "}
-                  <code>pm.response.json()</code>, <code>pm.console.log()</code>
+                  <code>pm.response.status()</code>, <code>pm.response.text()</code>,{" "}
+                  <code>pm.response.json()</code>, <code>pm.console.log()</code>,{" "}
+                  <code>pm.environment.set(key, value)</code> (current env),{" "}
+                  <code>await pm.sendRequest(&quot;folder/sub/request&quot;)</code> (chain)
                 </p>
                 <textarea
                   className="body-input"
@@ -898,15 +1028,54 @@ export default function App() {
             )}
             {error ? <span className="status-err">{error}</span> : null}
           </div>
-          {scriptLog ? (
-            <pre className="response-body" data-testid="script-log">
-              {scriptLog}
-            </pre>
+          {activeRequest?.script.trim() ? (
+            <div className="script-output-panel">
+              <h4>Completion script output</h4>
+              <pre className="response-body" data-testid="script-log">
+                {scriptLog || "(Run Send to execute the script.)"}
+              </pre>
+            </div>
           ) : null}
           {response ? (
-            <pre className="response-body" data-testid="response-body">
-              {response.body}
-            </pre>
+            <>
+              <div className="response-toolbar">
+                <button
+                  type="button"
+                  data-testid="response-view-raw"
+                  className={responseViewMode === "raw" ? "active" : ""}
+                  onClick={() => setResponseViewMode("raw")}
+                >
+                  Raw
+                </button>
+                <button
+                  type="button"
+                  data-testid="response-view-pretty"
+                  className={responseViewMode === "pretty" ? "active" : ""}
+                  onClick={() => setResponseViewMode("pretty")}
+                >
+                  Pretty
+                </button>
+                {showHtmlPreview ? (
+                  <button
+                    type="button"
+                    data-testid="response-preview-html"
+                    onClick={() => setHtmlPreviewOpen(true)}
+                  >
+                    Page preview
+                  </button>
+                ) : null}
+                {formattedResponse ? (
+                  <span className="response-format-badge">
+                    {formattedResponse.kind}
+                  </span>
+                ) : null}
+              </div>
+              <pre className="response-body" data-testid="response-body">
+                {responseViewMode === "pretty" && formattedResponse
+                  ? formattedResponse.text
+                  : response.body}
+              </pre>
+            </>
           ) : null}
         </div>
       </main>
@@ -975,6 +1144,12 @@ export default function App() {
       ) : null}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <SecretsDialog open={secretsOpen} onClose={() => setSecretsOpen(false)} />
+      {htmlPreviewOpen && response ? (
+        <HtmlPreviewModal
+          html={response.body}
+          onClose={() => setHtmlPreviewOpen(false)}
+        />
+      ) : null}
       {updateBanner ? (
         <UpdatePrompt
           currentVersion={updateBanner.currentVersion}
