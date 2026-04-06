@@ -37,13 +37,15 @@ export function HtmlPreviewModal({ html, onClose }: Props) {
         <p className="html-preview-hint">
           Read-only preview — interaction is disabled.
         </p>
-        <iframe
-          className="html-preview-frame"
-          title="HTML response preview"
-          srcDoc={html}
-          sandbox=""
-          style={{ pointerEvents: "none" }}
-        />
+        <div className="html-preview-frame-host">
+          <iframe
+            className="html-preview-frame"
+            title="HTML response preview"
+            srcDoc={html}
+            sandbox=""
+            style={{ pointerEvents: "none" }}
+          />
+        </div>
       </div>
     </div>
   );
