@@ -1,0 +1,24 @@
+---
+alwaysApply: true
+---
+# Echo Project - Token & Context Guardrails
+
+## 🛑 STRICT WORKFLOW RULES (MUST OBEY) 🛑
+
+1. **Always Plan First:** Before writing code, generating new files, or refactoring, you MUST provide a concise, bulleted step-by-step plan. 
+   - State which specific files you intend to modify.
+   - STOP and wait for the user to confirm (e.g., "Go ahead") before generating the code blocks.
+2. **Limit Blast Radius:** Do not attempt to modify or rewrite more than two files in a single response unless explicitly instructed.
+3. **Fail Gracefully (No Blind Searching):** If you do not know where a specific Rust struct, UI component, or function is located, DO NOT search the entire workspace. Ask the user to `@mention` the specific file.
+
+## 🎯 CONTEXT ISOLATION
+To prevent context bloat, adhere to strict directory boundaries based on the user's prompt:
+- **Frontend Tasks:** Restrict context gathering and file searches exclusively to `src/` (TypeScript/Vite).
+- **Backend/Native Tasks:** Restrict context gathering and file searches exclusively to `src-tauri/src/` (Rust).
+- **Testing Tasks:** Look only in `test/e2e/` (Playwright) or `vitest.config.ts`.
+- **Ignored Directories:** Never read or search `docs/`, `public/`, `scripts/`, or `examples/` unless the user explicitly `@mentions` a file inside them.
+
+## 📝 OUTPUT FORMAT
+- Keep responses extremely concise. 
+- Do not explain standard Rust, Tauri, or TypeScript concepts unless asked.
+- Output the absolute minimum code necessary to implement the fix or feature (use `// ... existing code` comments instead of rewriting entire files).
