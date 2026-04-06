@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CollectionNode } from "../types";
 import {
   addChildToFolder,
+  allRequestIds,
   appendRootFolder,
   createFolderNode,
   createRequestItem,
@@ -58,6 +59,11 @@ describe("collection helpers", () => {
 
   it("returns first request id", () => {
     expect(firstRequestId(sample)).toBe("r1");
+  });
+
+  it("collects all request ids", () => {
+    expect(allRequestIds(sample)).toEqual(new Set(["r1"]));
+    expect(allRequestIds([])).toEqual(new Set());
   });
 
   it("adds a child folder inside a folder", () => {

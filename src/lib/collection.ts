@@ -159,3 +159,16 @@ export function firstRequestId(nodes: CollectionNode[]): string | null {
   }
   return null;
 }
+
+/** All request node ids in the tree (for pruning ephemeral per-request caches). */
+export function allRequestIds(nodes: CollectionNode[]): Set<string> {
+  const ids = new Set<string>();
+  const walk = (ns: CollectionNode[]) => {
+    for (const n of ns) {
+      if (n.nodeType === "request") ids.add(n.id);
+      else walk(n.children);
+    }
+  };
+  walk(nodes);
+  return ids;
+}
