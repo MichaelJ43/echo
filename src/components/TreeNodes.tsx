@@ -1,5 +1,7 @@
-import { useCallback, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import type { CollectionNode } from "../types";
+import type { TreeInlineDraft } from "../lib/treeDraft";
+import { TreeInlineNameRow } from "./TreeInlineNameRow";
 
 /** Single open context menu for the folder tree (only one at a time). */
 export type TreeMenuState = {
@@ -15,6 +17,11 @@ type Props = {
   activeId: string | null;
   treeMenu: TreeMenuState | null;
   setTreeMenu: (v: TreeMenuState | null) => void;
+  treeDraft: TreeInlineDraft | null;
+  colonDraftError: boolean;
+  onDraftValueChange: (value: string) => void;
+  onDraftConfirm: () => void;
+  onDraftCancel: () => void;
   onSelectRequest: (id: string) => void;
   onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
   onImport: () => void | Promise<void>;
@@ -33,6 +40,11 @@ export function TreeNodes({
   activeId,
   treeMenu,
   setTreeMenu,
+  treeDraft,
+  colonDraftError,
+  onDraftValueChange,
+  onDraftConfirm,
+  onDraftCancel,
   onSelectRequest,
   onExportFolder,
   onImport,
@@ -54,6 +66,11 @@ export function TreeNodes({
           activeId={activeId}
           treeMenu={treeMenu}
           setTreeMenu={setTreeMenu}
+          treeDraft={treeDraft}
+          colonDraftError={colonDraftError}
+          onDraftValueChange={onDraftValueChange}
+          onDraftConfirm={onDraftConfirm}
+          onDraftCancel={onDraftCancel}
           onSelectRequest={onSelectRequest}
           onExportFolder={onExportFolder}
           onImport={onImport}
@@ -76,6 +93,11 @@ function TreeNode({
   activeId,
   treeMenu,
   setTreeMenu,
+  treeDraft,
+  colonDraftError,
+  onDraftValueChange,
+  onDraftConfirm,
+  onDraftCancel,
   onSelectRequest,
   onExportFolder,
   onImport,
@@ -92,6 +114,11 @@ function TreeNode({
   activeId: string | null;
   treeMenu: TreeMenuState | null;
   setTreeMenu: (v: TreeMenuState | null) => void;
+  treeDraft: TreeInlineDraft | null;
+  colonDraftError: boolean;
+  onDraftValueChange: (value: string) => void;
+  onDraftConfirm: () => void;
+  onDraftCancel: () => void;
   onSelectRequest: (id: string) => void;
   onExportFolder: (folderId: string, folderName: string) => void | Promise<void>;
   onImport: () => void | Promise<void>;
@@ -103,8 +130,25 @@ function TreeNode({
   onDeleteFolder: (folderId: string, folderName: string) => void;
   onDeleteRequest: (requestId: string, requestName: string) => void;
 }) {
-  /** Only used when node is a folder; request rows ignore this state. */
   const [expanded, setExpanded] = useState(true);
+
+  const renamingFolder =
+    treeDraft?.mode === "rename-folder" && treeDraft.folderId === node.id;
+  const renamingRequest =
+    node.nodeType === "request" &&
+    treeDraft?.mode === "rename-request" &&
+    treeDraft.requestId === node.id;
+
+  useEffect(() => {
+    if (!treeDraft) return;
+    if (node.nodeType !== "folder") return;
+    if (
+      (treeDraft.mode === "new-folder" || treeDraft.mode === "new-request") &&
+      treeDraft.parentId === node.id
+    ) {
+      setExpanded(true);
+    }
+  }, [treeDraft, node]);
 
   const onCtxFolder = useCallback(
     (e: MouseEvent) => {
@@ -139,6 +183,13 @@ function TreeNode({
     const showFolderMenu =
       treeMenu?.kind === "folder" && treeMenu.nodeId === node.id;
 
+    const showNewFolderDraft =
+      treeDraft?.mode === "new-folder" &&
+      treeDraft.parentId === node.id;
+    const showNewRequestDraft =
+      treeDraft?.mode === "new-request" &&
+      treeDraft.parentId === node.id;
+
     return (
       <div>
         <div
@@ -148,8 +199,11 @@ function TreeNode({
           tabIndex={0}
           aria-expanded={expanded}
           data-tree-context
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            if (!renamingFolder) setExpanded((v) => !v);
+          }}
           onKeyDown={(e) => {
+            if (renamingFolder) return;
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               setExpanded((v) => !v);
@@ -162,7 +216,20 @@ function TreeNode({
             {expanded ? "▼" : "▶"}
           </span>
           <span aria-hidden>📁</span>
-          <span>{node.name}</span>
+          {renamingFolder && treeDraft?.mode === "rename-folder" ? (
+            <TreeInlineNameRow
+              depth={0}
+              embedded
+              draft={treeDraft}
+              colonError={colonDraftError}
+              onChange={onDraftValueChange}
+              onConfirm={onDraftConfirm}
+              onCancel={onDraftCancel}
+              variant="folder"
+            />
+          ) : (
+            <span>{node.name}</span>
+          )}
         </div>
         {showFolderMenu ? (
           <div
@@ -201,7 +268,7 @@ function TreeNode({
                 void onExportFolder(node.id, node.name);
               }}
             >
-              Export folder…
+              Export folder
             </button>
             <button
               type="button"
@@ -222,7 +289,7 @@ function TreeNode({
                 onRenameFolder(node.id, node.name);
               }}
             >
-              Rename folder…
+              Rename folder
             </button>
             <div className="context-menu-sep" role="separator" />
             <button
@@ -239,23 +306,52 @@ function TreeNode({
           </div>
         ) : null}
         {expanded ? (
-          <TreeNodes
-            nodes={node.children}
-            depth={depth + 1}
-            activeId={activeId}
-            treeMenu={treeMenu}
-            setTreeMenu={setTreeMenu}
-            onSelectRequest={onSelectRequest}
-            onExportFolder={onExportFolder}
-            onImport={onImport}
-            onRenameFolder={onRenameFolder}
-            onExportRequest={onExportRequest}
-            onRenameRequest={onRenameRequest}
-            onCreateFolderInFolder={onCreateFolderInFolder}
-            onCreateRequestInFolder={onCreateRequestInFolder}
-            onDeleteFolder={onDeleteFolder}
-            onDeleteRequest={onDeleteRequest}
-          />
+          <>
+            <TreeNodes
+              nodes={node.children}
+              depth={depth + 1}
+              activeId={activeId}
+              treeMenu={treeMenu}
+              setTreeMenu={setTreeMenu}
+              treeDraft={treeDraft}
+              colonDraftError={colonDraftError}
+              onDraftValueChange={onDraftValueChange}
+              onDraftConfirm={onDraftConfirm}
+              onDraftCancel={onDraftCancel}
+              onSelectRequest={onSelectRequest}
+              onExportFolder={onExportFolder}
+              onImport={onImport}
+              onRenameFolder={onRenameFolder}
+              onExportRequest={onExportRequest}
+              onRenameRequest={onRenameRequest}
+              onCreateFolderInFolder={onCreateFolderInFolder}
+              onCreateRequestInFolder={onCreateRequestInFolder}
+              onDeleteFolder={onDeleteFolder}
+              onDeleteRequest={onDeleteRequest}
+            />
+            {showNewFolderDraft && treeDraft?.mode === "new-folder" ? (
+              <TreeInlineNameRow
+                depth={depth + 1}
+                draft={treeDraft}
+                colonError={colonDraftError}
+                onChange={onDraftValueChange}
+                onConfirm={onDraftConfirm}
+                onCancel={onDraftCancel}
+                variant="folder"
+              />
+            ) : null}
+            {showNewRequestDraft && treeDraft?.mode === "new-request" ? (
+              <TreeInlineNameRow
+                depth={depth + 1}
+                draft={treeDraft}
+                colonError={colonDraftError}
+                onChange={onDraftValueChange}
+                onConfirm={onDraftConfirm}
+                onCancel={onDraftCancel}
+                variant="request"
+              />
+            ) : null}
+          </>
         ) : null}
       </div>
     );
@@ -277,7 +373,20 @@ function TreeNode({
       >
         <span className="tree-indent" aria-hidden />
         <span aria-hidden>▸</span>
-        <span>{node.name}</span>
+        {renamingRequest && treeDraft?.mode === "rename-request" ? (
+          <TreeInlineNameRow
+            depth={0}
+            embedded
+            draft={treeDraft}
+            colonError={colonDraftError}
+            onChange={onDraftValueChange}
+            onConfirm={onDraftConfirm}
+            onCancel={onDraftCancel}
+            variant="request"
+          />
+        ) : (
+          <span>{node.name}</span>
+        )}
       </div>
       {showRequestMenu ? (
         <div

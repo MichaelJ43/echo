@@ -46,7 +46,7 @@
 2. **Send:** `buildExpandedSendPayload` (`src/lib/expandForSend.ts`) resolves **`{{request:folder/sub/requestName}}`** (entire cached response body) or **`{{request:folder/sub/requestName:dot.path}}`** (value from the body parsed as JSON or YAML via `js-yaml`, then dotted path) against an in-memory **last-response cache** (per request id; not persisted), then **`{{variable}}`** from the active environment, then builds `SendRequestPayload` → `send_http_request` (Tauri) or `sendHttpRequestBrowser` (`src/api.ts`). **`{{secret:NAME}}`** is still resolved only in Rust for the desktop app; web build errors if secrets are present.
 3. **Persistence:** Rust writes JSON to the OS app data directory (`app.path().app_data_dir()` + `collections.json`). Paths surfaced in UI via `get_paths`. Response cache for request chaining is **session-only** (RAM).
 4. **Import/export:** Dialog plugin + `import_workspace_file` / `export_workspace_file` (full workspace JSON).
-5. **Collections tree:** Root **+ Folder** adds a top-level folder. Folder/request context menus (create, export, rename, delete, import). **Folder and request names cannot contain `:`** (validated on create/rename; `alert` with `src/lib/treeNames.ts`). Mutations use `src/lib/collection.ts` from `App.tsx` / `components/TreeNodes.tsx`.
+5. **Collections tree:** Root **+ Folder** adds a top-level folder. Folder/request context menus (create, export, rename, delete, import). **Folder and request names cannot contain `:`** (validated on create/rename; inline hint next to the name field via `src/lib/treeNames.ts`, no modal). Create/rename uses **inline editing** in the tree (`TreeInlineNameRow`, `src/lib/treeDraft.ts`). Mutations use `src/lib/collection.ts` from `App.tsx` / `components/TreeNodes.tsx`.
 6. **Completion scripts** (`src/lib/scriptRunner.ts`): async **`pm` API** — `pm.response.*`, `pm.console.log`, **`pm.environment.set(key, value)`** (updates variables on the request’s environment), **`await pm.sendRequest("folder/sub/request")`** (chains another request, max depth 8). Response panel: **Raw / Pretty** structured body, **Page preview** for HTML (sandboxed, non-interactive iframe).
 
 ---
@@ -57,8 +57,8 @@
 src/                      # React + TS UI, Vite client
   api.ts                  # Tauri invoke + browser fallbacks
   App.tsx, App.css        # Root layout
-  components/             # TreeNodes, UpdatePrompt, SecretsDialog, HtmlPreviewModal
-  lib/                    # variables, collection, requestRef, expandForSend, responseFormat, treeNames, scriptRunner, secretPlaceholders
+  components/             # TreeNodes, TreeInlineNameRow, UpdatePrompt, SecretsDialog, HtmlPreviewModal
+  lib/                    # variables, collection, requestRef, expandForSend, responseFormat, treeNames, treeDraft, scriptRunner, secretPlaceholders
   types.ts
   *.test.ts(x)            # Vitest co-located tests
 public/                   # Static assets for Vite (e.g. logo.png for favicon + sidebar)

@@ -37,11 +37,16 @@ import {
   isLikelyHtmlDocument,
 } from "./lib/responseFormat";
 import { runCompletionScript } from "./lib/scriptRunner";
-import { TREE_NAME_COLON_ERROR, treeNameContainsColon } from "./lib/treeNames";
+import { treeNameContainsColon } from "./lib/treeNames";
+import {
+  resolvedDraftName,
+  type TreeInlineDraft,
+} from "./lib/treeDraft";
 import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
 import { AboutDialog } from "./components/AboutDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { SecretsDialog } from "./components/SecretsDialog";
+import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
 import { TreeNodes, type TreeMenuState } from "./components/TreeNodes";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import {
@@ -91,6 +96,7 @@ export default function App() {
     "pretty"
   );
   const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false);
+  const [treeDraft, setTreeDraft] = useState<TreeInlineDraft | null>(null);
   const stateRef = useRef<AppState | null>(null);
   const lastResponsesRef = useRef<Record<string, HttpResponsePayload>>({});
 
@@ -201,6 +207,107 @@ export default function App() {
       response.body,
       getContentTypeFromHeaders(response.headers)
     );
+
+  const colonDraftError = useMemo(
+    () =>
+      treeDraft !== null &&
+      treeNameContainsColon(resolvedDraftName(treeDraft)),
+    [treeDraft]
+  );
+
+  const updateDraftValue = useCallback((value: string) => {
+    setTreeDraft((prev) => (prev ? { ...prev, value } : null));
+  }, []);
+
+  const cancelTreeDraft = useCallback(() => {
+    setTreeDraft(null);
+  }, []);
+
+  const commitTreeDraft = useCallback(() => {
+    if (!treeDraft || !state) return;
+    const name = resolvedDraftName(treeDraft);
+    if (treeNameContainsColon(name)) return;
+
+    switch (treeDraft.mode) {
+      case "new-folder": {
+        const folder = createFolderNode(name);
+        if (treeDraft.parentId === null) {
+          setState((prev) =>
+            prev
+              ? { ...prev, collections: appendRootFolder(prev.collections, folder) }
+              : prev
+          );
+        } else {
+          const parentId = treeDraft.parentId;
+          if (parentId === null) break;
+          setState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  collections: addChildToFolder(
+                    prev.collections,
+                    parentId,
+                    folder
+                  ),
+                }
+              : prev
+          );
+        }
+        break;
+      }
+      case "new-request": {
+        const envId = state.environments[0]?.id;
+        if (!envId) break;
+        const req = createRequestItem(name, envId);
+        const node = requestToNode(req);
+        setState((prev) =>
+          prev
+            ? {
+                ...prev,
+                collections: addChildToFolder(
+                  prev.collections,
+                  treeDraft.parentId,
+                  node
+                ),
+                activeRequestId: req.id,
+              }
+            : prev
+        );
+        break;
+      }
+      case "rename-folder":
+        setState((prev) =>
+          prev
+            ? {
+                ...prev,
+                collections: renameFolderById(
+                  prev.collections,
+                  treeDraft.folderId,
+                  name
+                ),
+              }
+            : prev
+        );
+        break;
+      case "rename-request":
+        setState((prev) =>
+          prev
+            ? {
+                ...prev,
+                collections: mapCollection(
+                  prev.collections,
+                  treeDraft.requestId,
+                  (r) => ({ ...r, name })
+                ),
+              }
+            : prev
+        );
+        break;
+      default:
+        break;
+    }
+    setTreeDraft(null);
+  }, [treeDraft, state]);
 
   const updateActiveRequest = useCallback(
     (fn: (r: RequestItem) => RequestItem) => {
@@ -362,39 +469,20 @@ export default function App() {
   );
 
   const onRenameFolder = useCallback((folderId: string, currentName: string) => {
-    const name = window.prompt("Folder name", currentName);
-    if (name === null) return;
-    const trimmed = name.trim() || currentName;
-    if (treeNameContainsColon(trimmed)) {
-      window.alert(TREE_NAME_COLON_ERROR);
-      return;
-    }
-    setState((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        collections: renameFolderById(prev.collections, folderId, trimmed),
-      };
+    setTreeDraft({
+      mode: "rename-folder",
+      folderId,
+      originalName: currentName,
+      value: currentName,
     });
   }, []);
 
   const onRenameRequest = useCallback((requestId: string, currentName: string) => {
-    const name = window.prompt("Request name", currentName);
-    if (name === null) return;
-    const trimmed = name.trim() || currentName;
-    if (treeNameContainsColon(trimmed)) {
-      window.alert(TREE_NAME_COLON_ERROR);
-      return;
-    }
-    setState((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        collections: mapCollection(prev.collections, requestId, (r) => ({
-          ...r,
-          name: trimmed,
-        })),
-      };
+    setTreeDraft({
+      mode: "rename-request",
+      requestId,
+      originalName: currentName,
+      value: currentName,
     });
   }, []);
 
@@ -414,61 +502,15 @@ export default function App() {
   }, []);
 
   const onCreateRootFolder = useCallback(() => {
-    const name = window.prompt("Folder name", "My folder");
-    if (name === null) return;
-    const trimmed = name.trim() || "My folder";
-    if (treeNameContainsColon(trimmed)) {
-      window.alert(TREE_NAME_COLON_ERROR);
-      return;
-    }
-    setState((prev) => {
-      if (!prev) return prev;
-      const folder = createFolderNode(trimmed);
-      return {
-        ...prev,
-        collections: appendRootFolder(prev.collections, folder),
-      };
-    });
+    setTreeDraft({ mode: "new-folder", parentId: null, value: "" });
   }, []);
 
   const onCreateFolderInFolder = useCallback((parentId: string) => {
-    const name = window.prompt("Folder name", "New folder");
-    if (name === null) return;
-    const trimmed = name.trim() || "New folder";
-    if (treeNameContainsColon(trimmed)) {
-      window.alert(TREE_NAME_COLON_ERROR);
-      return;
-    }
-    setState((prev) => {
-      if (!prev) return prev;
-      const child = createFolderNode(trimmed);
-      return {
-        ...prev,
-        collections: addChildToFolder(prev.collections, parentId, child),
-      };
-    });
+    setTreeDraft({ mode: "new-folder", parentId, value: "" });
   }, []);
 
   const onCreateRequestInFolder = useCallback((parentId: string) => {
-    const name = window.prompt("Request name", "New request");
-    if (name === null) return;
-    const trimmed = name.trim() || "New request";
-    if (treeNameContainsColon(trimmed)) {
-      window.alert(TREE_NAME_COLON_ERROR);
-      return;
-    }
-    setState((prev) => {
-      if (!prev) return prev;
-      const envId = prev.environments[0]?.id;
-      if (!envId) return prev;
-      const req = createRequestItem(trimmed, envId);
-      const node = requestToNode(req);
-      return {
-        ...prev,
-        collections: addChildToFolder(prev.collections, parentId, node),
-        activeRequestId: req.id,
-      };
-    });
+    setTreeDraft({ mode: "new-request", parentId, value: "" });
   }, []);
 
   const onDeleteFolder = useCallback((folderId: string, folderName: string) => {
@@ -518,6 +560,7 @@ export default function App() {
     e.preventDefault();
     e.stopPropagation();
     setTreeContextMenu(null);
+    setTreeDraft(null);
     setMetaMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
@@ -526,15 +569,20 @@ export default function App() {
       e.stopPropagation();
       setTreeContextMenu(null);
       const r = e.currentTarget.getBoundingClientRect();
-      setMetaMenu((prev) =>
-        prev ? null : { x: r.left, y: r.bottom + 4 }
-      );
+      setMetaMenu((prev) => {
+        if (prev) return null;
+        setTreeDraft(null);
+        return { x: r.left, y: r.bottom + 4 };
+      });
     },
     []
   );
 
   const handleSetTreeMenu = useCallback((v: TreeMenuState | null) => {
-    if (v) setMetaMenu(null);
+    if (v) {
+      setMetaMenu(null);
+      setTreeDraft(null);
+    }
     setTreeContextMenu(v);
   }, []);
 
@@ -699,11 +747,27 @@ export default function App() {
           </button>
         </div>
         <div className="tree">
+          {treeDraft?.mode === "new-folder" && treeDraft.parentId === null ? (
+            <TreeInlineNameRow
+              depth={0}
+              draft={treeDraft}
+              colonError={colonDraftError}
+              onChange={updateDraftValue}
+              onConfirm={commitTreeDraft}
+              onCancel={cancelTreeDraft}
+              variant="folder"
+            />
+          ) : null}
           <TreeNodes
             nodes={state.collections}
             activeId={state.activeRequestId}
             treeMenu={treeContextMenu}
             setTreeMenu={handleSetTreeMenu}
+            treeDraft={treeDraft}
+            colonDraftError={colonDraftError}
+            onDraftValueChange={updateDraftValue}
+            onDraftConfirm={commitTreeDraft}
+            onDraftCancel={cancelTreeDraft}
             onSelectRequest={(id) =>
               setState((s) => (s ? { ...s, activeRequestId: id } : s))
             }
