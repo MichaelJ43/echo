@@ -19,6 +19,7 @@ type PmApi = {
 /**
  * Runs user script after a response (Postman-style `pm` subset).
  * Supports async/await and `await pm.sendRequest(...)`.
+ * Log output must use **`pm.console.log`** (global `console.log` is not captured in the UI).
  * Executes in an isolated AsyncFunction; avoid untrusted scripts in production.
  */
 export async function runCompletionScript(

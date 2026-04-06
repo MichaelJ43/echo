@@ -328,7 +328,7 @@
               "body": "",
               "bodyType": "none",
               "auth": { "type": "none" },
-              "script": "const data = pm.response.json();\nconst author = data.slideshow && data.slideshow.author;\nconsole.log(\"Slideshow author:\", author);\nconsole.log(\"HTTP status:\", pm.response.status());"
+              "script": "const data = pm.response.json();\nconst author = data.slideshow && data.slideshow.author;\npm.console.log(\"Slideshow author:\", author);\npm.console.log(\"HTTP status:\", pm.response.status());"
             },
             {
               "nodeType": "request",
@@ -342,7 +342,7 @@
               "body": "{\n  \"title\": \"Echo completion script\",\n  \"body\": \"Check the script log below after Send.\",\n  \"userId\": 1\n}",
               "bodyType": "json",
               "auth": { "type": "none" },
-              "script": "const created = pm.response.json();\nconsole.log(\"New post id:\", created.id);\nconsole.log(\"Title:\", created.title);\nconsole.log(\"Status code:\", pm.response.status());"
+              "script": "const created = pm.response.json();\npm.console.log(\"New post id:\", created.id);\npm.console.log(\"Title:\", created.title);\npm.console.log(\"Status code:\", pm.response.status());"
             }
           ]
         }
