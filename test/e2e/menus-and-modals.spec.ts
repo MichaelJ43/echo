@@ -107,7 +107,21 @@ test.describe("Folder tree context menus", () => {
     await page.locator('[data-testid^="folder-"]').first().click({ button: "right" });
     await expect(page.getByTestId("folder-context-menu")).toBeVisible();
 
-    await page.locator('[data-testid^="request-"]').first().click({ button: "right" });
+    // Folder menu can overlap the first request row; dispatch contextmenu on the row so it reaches React.
+    await page.locator('[data-testid^="request-"]').first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+          button: 2,
+          buttons: 2,
+        })
+      );
+    });
 
     await expect(page.getByTestId("folder-context-menu")).toHaveCount(0);
     await expect(page.getByTestId("request-context-menu")).toBeVisible();
