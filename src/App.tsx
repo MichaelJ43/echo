@@ -31,6 +31,7 @@ import {
   sliceWorkspaceForRequestExport,
 } from "./lib/workspaceSlice";
 import { buildExpandedSendPayload } from "./lib/expandForSend";
+import { mergeImportedUnderFolder } from "./lib/importWorkspace";
 import { findRequestByPath } from "./lib/requestRef";
 import {
   formatResponseBody,
@@ -46,6 +47,7 @@ import {
 } from "./lib/treeDraft";
 import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
 import { AboutDialog } from "./components/AboutDialog";
+import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfirmDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
@@ -101,6 +103,7 @@ export default function App() {
   );
   const [secretsOpen, setSecretsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [importReplaceDialogOpen, setImportReplaceDialogOpen] = useState(false);
   const [lastResponses, setLastResponses] = useState<
     Record<string, HttpResponsePayload>
   >({});
@@ -593,19 +596,50 @@ export default function App() {
     });
   }, []);
 
-  const onImport = useCallback(async () => {
+  const onImportUnderFolder = useCallback(async (folderId: string) => {
     const file = await open({
       multiple: false,
       filters: [{ name: "Echo workspace", extensions: ["json"] }],
     });
     if (file === null || Array.isArray(file)) return;
-    const imported = await importWorkspaceFile(file);
-    let next = imported;
-    if (!next.activeRequestId) {
-      const fid = firstRequestId(next.collections);
-      if (fid) next = { ...next, activeRequestId: fid };
+    try {
+      const imported = await importWorkspaceFile(file);
+      const prev = stateRef.current;
+      if (!prev) return;
+      const merged = mergeImportedUnderFolder(prev, folderId, imported);
+      if (!merged) {
+        setInfoToast("Could not import into that folder.");
+        return;
+      }
+      let next = merged;
+      if (!next.activeRequestId) {
+        const fid = firstRequestId(next.collections);
+        if (fid) next = { ...next, activeRequestId: fid };
+      }
+      setState(next);
+    } catch (e) {
+      setInfoToast(e instanceof Error ? e.message : String(e));
     }
-    setState(next);
+  }, []);
+
+  const runImportReplaceWorkspace = useCallback(async () => {
+    setImportReplaceDialogOpen(false);
+    const file = await open({
+      multiple: false,
+      filters: [{ name: "Echo workspace", extensions: ["json"] }],
+    });
+    if (file === null || Array.isArray(file)) return;
+    try {
+      const imported = await importWorkspaceFile(file);
+      let next = imported;
+      if (!next.activeRequestId) {
+        const fid = firstRequestId(next.collections);
+        if (fid) next = { ...next, activeRequestId: fid };
+      }
+      setState(next);
+    } catch (e) {
+      setInfoToast(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
   const onCreateRootFolder = useCallback(() => {
@@ -881,7 +915,7 @@ export default function App() {
               setState((s) => (s ? { ...s, activeRequestId: id } : s))
             }
             onExportFolder={onExportFolder}
-            onImport={onImport}
+            onImportUnderFolder={onImportUnderFolder}
             onRenameFolder={onRenameFolder}
             onExportRequest={onExportRequest}
             onRenameRequest={onRenameRequest}
@@ -1324,6 +1358,16 @@ export default function App() {
           >
             Export workspace
           </button>
+          <button
+            type="button"
+            data-testid="meta-menu-import-workspace"
+            onClick={() => {
+              setMetaMenu(null);
+              setImportReplaceDialogOpen(true);
+            }}
+          >
+            Import workspace…
+          </button>
           <div className="context-menu-sep" role="separator" />
           <button
             type="button"
@@ -1338,6 +1382,11 @@ export default function App() {
         </div>
       ) : null}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <ImportWorkspaceConfirmDialog
+        open={importReplaceDialogOpen}
+        onClose={() => setImportReplaceDialogOpen(false)}
+        onConfirmReplace={runImportReplaceWorkspace}
+      />
       <SecretsDialog open={secretsOpen} onClose={() => setSecretsOpen(false)} />
       {htmlPreviewOpen && response ? (
         <HtmlPreviewModal
