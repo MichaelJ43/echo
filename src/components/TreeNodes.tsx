@@ -16,6 +16,10 @@ import {
   type ReactNode,
 } from "react";
 import type { CollectionNode } from "../types";
+import {
+  nextPathOnlyDescent,
+  visibleFolderChildren,
+} from "../lib/collection";
 import type { TreeInlineDraft } from "../lib/treeDraft";
 import { TreeInlineNameRow } from "./TreeInlineNameRow";
 
@@ -78,7 +82,23 @@ type Props = {
   onToggleFolderCollapsed: (folderId: string) => void;
   onEnsureFolderExpanded: (folderId: string) => void;
   onMoveNode: (nodeId: string, dest: MoveNodeDest) => void;
+  /**
+   * When true, only the branch toward `activeId` is shown (ancestor folder was collapsed with active inside).
+   */
+  pathOnlyDescent?: boolean;
+  /** Full child list at this level; used for drag/drop indices when `nodes` is path-filtered. */
+  siblingListForIndex?: CollectionNode[];
 };
+
+function indexInSiblingList(
+  siblingList: CollectionNode[] | undefined,
+  nodeId: string,
+  visibleIndex: number
+): number {
+  if (!siblingList) return visibleIndex;
+  const ix = siblingList.findIndex((c) => c.id === nodeId);
+  return ix >= 0 ? ix : visibleIndex;
+}
 
 export function TreeNodes(props: Props) {
   const [draggingId, setDraggingIdState] = useState<string | null>(null);
@@ -136,6 +156,8 @@ function TreeNodesList(props: Props & { parentFolderId: string | null }) {
     onToggleFolderCollapsed,
     onEnsureFolderExpanded,
     onMoveNode,
+    pathOnlyDescent = false,
+    siblingListForIndex,
   } = props;
 
   const common = {
@@ -161,27 +183,35 @@ function TreeNodesList(props: Props & { parentFolderId: string | null }) {
     onToggleFolderCollapsed,
     onEnsureFolderExpanded,
     onMoveNode,
+    pathOnlyDescent,
   };
 
   if (nodes.length === 0) {
     return <DropGap parentId={parentFolderId} beforeIndex={0} />;
   }
 
+  const tailBeforeIndex = siblingListForIndex
+    ? siblingListForIndex.length
+    : nodes.length;
+
   return (
     <>
-      {nodes.map((n, i) => (
-        <Fragment key={n.id}>
-          <DropGap parentId={parentFolderId} beforeIndex={i} />
-          <TreeNode
-            node={n}
-            indexInParent={i}
-            parentFolderId={parentFolderId}
-            depth={depth}
-            {...common}
-          />
-        </Fragment>
-      ))}
-      <DropGap parentId={parentFolderId} beforeIndex={nodes.length} />
+      {nodes.map((n, i) => {
+        const realIndex = indexInSiblingList(siblingListForIndex, n.id, i);
+        return (
+          <Fragment key={n.id}>
+            <DropGap parentId={parentFolderId} beforeIndex={realIndex} />
+            <TreeNode
+              node={n}
+              indexInParent={realIndex}
+              parentFolderId={parentFolderId}
+              depth={depth}
+              {...common}
+            />
+          </Fragment>
+        );
+      })}
+      <DropGap parentId={parentFolderId} beforeIndex={tailBeforeIndex} />
     </>
   );
 }
@@ -264,11 +294,13 @@ function TreeNode({
   onToggleFolderCollapsed,
   onEnsureFolderExpanded,
   onMoveNode,
+  pathOnlyDescent,
 }: {
   node: CollectionNode;
   depth: number;
   indexInParent: number;
   parentFolderId: string | null;
+  pathOnlyDescent: boolean;
   activeId: string | null;
   treeMenu: TreeMenuState | null;
   setTreeMenu: (v: TreeMenuState | null) => void;
@@ -342,7 +374,20 @@ function TreeNode({
   );
 
   if (node.nodeType === "folder") {
-    const expanded = collapsedFolderIds[node.id] !== true;
+    const userCollapsed = collapsedFolderIds[node.id] === true;
+    const visibleChildren = visibleFolderChildren(
+      node,
+      activeId,
+      collapsedFolderIds,
+      pathOnlyDescent
+    );
+    const pathNext = nextPathOnlyDescent(
+      node,
+      activeId,
+      collapsedFolderIds,
+      pathOnlyDescent
+    );
+    const showTreeBody = visibleChildren.length > 0 || !userCollapsed;
     const showFolderMenu =
       treeMenu?.kind === "folder" && treeMenu.nodeId === node.id;
 
@@ -361,7 +406,7 @@ function TreeNode({
           style={{ paddingLeft: 8 + depth * 12 }}
           role="button"
           tabIndex={0}
-          aria-expanded={expanded}
+          aria-expanded={showTreeBody}
           data-tree-context
           data-tree-folder-id={node.id}
           draggable
@@ -421,7 +466,7 @@ function TreeNode({
           data-testid={`folder-${node.id}`}
         >
           <span className="tree-chevron" aria-hidden>
-            {expanded ? "▼" : "▶"}
+            {userCollapsed ? "▶" : "▼"}
           </span>
           <span aria-hidden>📁</span>
           {renamingFolder && treeDraft?.mode === "rename-folder" ? (
@@ -512,10 +557,12 @@ function TreeNode({
             </button>
           </PositionedContextMenu>
         ) : null}
-        {expanded ? (
+        {showTreeBody ? (
           <>
             <TreeNodesList
-              nodes={node.children}
+              nodes={visibleChildren}
+              siblingListForIndex={node.children}
+              pathOnlyDescent={pathNext}
               depth={depth + 1}
               parentFolderId={node.id}
               activeId={activeId}
@@ -541,7 +588,7 @@ function TreeNode({
               onEnsureFolderExpanded={onEnsureFolderExpanded}
               onMoveNode={onMoveNode}
             />
-            {showNewFolderDraft && treeDraft?.mode === "new-folder" ? (
+            {!userCollapsed && showNewFolderDraft && treeDraft?.mode === "new-folder" ? (
               <TreeInlineNameRow
                 depth={depth + 1}
                 draft={treeDraft}
@@ -552,7 +599,7 @@ function TreeNode({
                 variant="folder"
               />
             ) : null}
-            {showNewRequestDraft && treeDraft?.mode === "new-request" ? (
+            {!userCollapsed && showNewRequestDraft && treeDraft?.mode === "new-request" ? (
               <TreeInlineNameRow
                 depth={depth + 1}
                 draft={treeDraft}

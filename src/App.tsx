@@ -25,7 +25,6 @@ import {
   appendRootFolder,
   createFolderNode,
   createRequestItem,
-  findAncestorFolderIdsForRequest,
   findRequest,
   firstRequestId,
   mapCollection,
@@ -258,27 +257,6 @@ export default function App() {
   useEffect(() => {
     setHtmlPreviewOpen(false);
   }, [state?.activeRequestId]);
-
-  /** Keep every folder on the path to the active request expanded (re-runs when user collapses an ancestor). */
-  useEffect(() => {
-    if (!state?.activeRequestId) return;
-    const ancestors = findAncestorFolderIdsForRequest(
-      state.collections,
-      state.activeRequestId
-    );
-    if (!ancestors?.length) return;
-    setCollapsedFolderIds((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const id of ancestors) {
-        if (next[id]) {
-          delete next[id];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [state?.activeRequestId, state?.collections, collapsedFolderIds]);
 
   useLayoutEffect(() => {
     if (!state?.activeRequestId) return;

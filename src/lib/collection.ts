@@ -214,6 +214,74 @@ export function isDescendantOfFolder(
   return false;
 }
 
+/** True if `requestId` appears anywhere under `nodes`. */
+export function collectionContainsRequestId(
+  nodes: CollectionNode[],
+  requestId: string
+): boolean {
+  for (const n of nodes) {
+    if (n.nodeType === "request" && n.id === requestId) return true;
+    if (n.nodeType === "folder" && collectionContainsRequestId(n.children, requestId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Direct child of `folder` that lies on the path to `requestId` (folder or request). */
+export function firstChildOnPathToRequest(
+  folder: CollectionNode & { nodeType: "folder" },
+  requestId: string
+): CollectionNode | null {
+  for (const c of folder.children) {
+    if (c.nodeType === "request" && c.id === requestId) return c;
+    if (c.nodeType === "folder" && collectionContainsRequestId(c.children, requestId)) {
+      return c;
+    }
+  }
+  return null;
+}
+
+/**
+ * Children to render under a folder in the tree UI.
+ * - Normal: all children when not collapsed.
+ * - Collapsed + active request inside: only the single branch toward that request.
+ * - `pathOnlyDescent`: parent already in that branch mode — keep showing only the path (hide siblings).
+ */
+export function visibleFolderChildren(
+  folder: CollectionNode & { nodeType: "folder" },
+  activeRequestId: string | null,
+  collapsedFolderIds: Record<string, true>,
+  pathOnlyDescent: boolean
+): CollectionNode[] {
+  const contains =
+    !!activeRequestId &&
+    collectionContainsRequestId(folder.children, activeRequestId);
+  const collapsed = collapsedFolderIds[folder.id] === true;
+
+  if (pathOnlyDescent || (collapsed && contains)) {
+    if (!activeRequestId) return [];
+    const next = firstChildOnPathToRequest(folder, activeRequestId);
+    return next ? [next] : [];
+  }
+  if (collapsed) return [];
+  return folder.children;
+}
+
+/** Pass to child folders/list when rendering `visibleFolderChildren` in path-only mode. */
+export function nextPathOnlyDescent(
+  folder: CollectionNode & { nodeType: "folder" },
+  activeRequestId: string | null,
+  collapsedFolderIds: Record<string, true>,
+  pathOnlyDescent: boolean
+): boolean {
+  const contains =
+    !!activeRequestId &&
+    collectionContainsRequestId(folder.children, activeRequestId);
+  const collapsed = collapsedFolderIds[folder.id] === true;
+  return pathOnlyDescent || (collapsed && contains);
+}
+
 /** Folder ids from root down to the parent of the given request (empty if request is at root). */
 export function findAncestorFolderIdsForRequest(
   nodes: CollectionNode[],

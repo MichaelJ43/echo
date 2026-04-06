@@ -4,19 +4,23 @@ import {
   addChildToFolder,
   allRequestIds,
   appendRootFolder,
+  collectionContainsRequestId,
   createFolderNode,
   createRequestItem,
   extractNode,
   findAncestorFolderIdsForRequest,
   findRequest,
+  firstChildOnPathToRequest,
   firstRequestId,
   insertChildAt,
   isDescendantOfFolder,
   mapCollection,
   moveNode,
+  nextPathOnlyDescent,
   removeNodeById,
   renameFolderById,
   requestToNode,
+  visibleFolderChildren,
 } from "./collection";
 
 const sample: CollectionNode[] = [
@@ -179,5 +183,62 @@ describe("collection helpers", () => {
     expect(ex.node?.nodeType).toBe("request");
     const back = insertChildAt(ex.nodes, "f1", 0, ex.node!);
     expect(findRequest(back, "r1")?.name).toBe("A");
+  });
+
+  it("visibleFolderChildren shows path only when collapsed with active inside", () => {
+    const rVis = requestToNode(createRequestItem("visible", "e0"));
+    if (rVis.nodeType !== "request") throw new Error("expected request");
+    rVis.id = "r_vis";
+    const rOther = requestToNode(createRequestItem("other", "e0"));
+    if (rOther.nodeType !== "request") throw new Error("expected request");
+    rOther.id = "r_other";
+
+    const fChain = createFolderNode("folder_chain");
+    if (fChain.nodeType !== "folder") throw new Error("expected folder");
+    fChain.id = "f_chain";
+    fChain.children = [rVis, rOther];
+
+    const fEx = createFolderNode("example");
+    if (fEx.nodeType !== "folder") throw new Error("expected folder");
+    fEx.id = "f_ex";
+    fEx.children = [fChain];
+
+    const collapsed = { f_ex: true as const };
+    const vis = visibleFolderChildren(fEx, "r_vis", collapsed, false);
+    expect(vis.map((c) => c.id)).toEqual(["f_chain"]);
+    expect(nextPathOnlyDescent(fEx, "r_vis", collapsed, false)).toBe(true);
+
+    const visChain = visibleFolderChildren(fChain, "r_vis", collapsed, true);
+    expect(visChain.map((c) => c.id)).toEqual(["r_vis"]);
+  });
+
+  it("visibleFolderChildren hides all when collapsed without active inside", () => {
+    const r1 = requestToNode(createRequestItem("a", "e0"));
+    if (r1.nodeType !== "request") throw new Error("expected request");
+    r1.id = "r1";
+    const f = createFolderNode("f");
+    if (f.nodeType !== "folder") throw new Error("expected folder");
+    f.id = "f1";
+    f.children = [r1];
+    const collapsed = { f1: true as const };
+    expect(visibleFolderChildren(f, "r999", collapsed, false)).toEqual([]);
+  });
+
+  it("collectionContainsRequestId and firstChildOnPathToRequest", () => {
+    const r1 = requestToNode(createRequestItem("a", "e0"));
+    if (r1.nodeType !== "request") throw new Error("expected request");
+    r1.id = "r1";
+    const inner = createFolderNode("inner");
+    if (inner.nodeType !== "folder") throw new Error("expected folder");
+    inner.id = "fin";
+    inner.children = [r1];
+    const root = createFolderNode("root");
+    if (root.nodeType !== "folder") throw new Error("expected folder");
+    root.id = "froot";
+    root.children = [inner];
+
+    expect(collectionContainsRequestId(root.children, "r1")).toBe(true);
+    expect(collectionContainsRequestId(root.children, "rx")).toBe(false);
+    expect(firstChildOnPathToRequest(root, "r1")?.id).toBe("fin");
   });
 });
