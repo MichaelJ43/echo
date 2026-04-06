@@ -8,6 +8,7 @@ import {
   getPaths,
   importWorkspaceFile,
   loadState,
+  openContainingFolder,
   saveState,
   sendHttpRequest,
 } from "./api";
@@ -17,10 +18,12 @@ import {
   appendRootFolder,
   createFolderNode,
   createRequestItem,
+  findAncestorFolderIdsForRequest,
   findRequest,
   firstRequestId,
   mapCollection,
   mapEveryRequest,
+  moveNode,
   removeNodeById,
   renameFolderById,
   requestToNode,
@@ -51,7 +54,11 @@ import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfir
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
-import { TreeNodes, type TreeMenuState } from "./components/TreeNodes";
+import {
+  TreeNodes,
+  type MoveNodeDest,
+  type TreeMenuState,
+} from "./components/TreeNodes";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import {
   fetchUpdateIfAvailable,
@@ -72,6 +79,23 @@ const METHODS = [
 ];
 
 const SCRIPT_CHAIN_MAX = 8;
+
+const SIDEBAR_WIDTH_STORAGE_KEY = "echo.sidebarWidthPx";
+const DEFAULT_SIDEBAR_WIDTH_PX = 280;
+const MIN_SIDEBAR_WIDTH_PX = 200;
+const MAX_SIDEBAR_WIDTH_PX = 560;
+
+function readInitialSidebarWidth(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    if (!raw) return DEFAULT_SIDEBAR_WIDTH_PX;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n)) return DEFAULT_SIDEBAR_WIDTH_PX;
+    return Math.min(MAX_SIDEBAR_WIDTH_PX, Math.max(MIN_SIDEBAR_WIDTH_PX, n));
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH_PX;
+  }
+}
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -113,6 +137,13 @@ export default function App() {
   >({});
   const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false);
   const [treeDraft, setTreeDraft] = useState<TreeInlineDraft | null>(null);
+  /** Folder ids that are explicitly collapsed (absent = expanded). */
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Record<string, true>>(
+    {}
+  );
+  const [sidebarWidthPx, setSidebarWidthPx] = useState(readInitialSidebarWidth);
+  const sidebarResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef<AppState | null>(null);
   const lastResponsesRef = useRef<Record<string, HttpResponsePayload>>({});
 
@@ -220,6 +251,64 @@ export default function App() {
   useEffect(() => {
     setHtmlPreviewOpen(false);
   }, [state?.activeRequestId]);
+
+  useEffect(() => {
+    if (!state?.activeRequestId) return;
+    const ancestors = findAncestorFolderIdsForRequest(
+      state.collections,
+      state.activeRequestId
+    );
+    if (!ancestors) return;
+    setCollapsedFolderIds((prev) => {
+      const next = { ...prev };
+      for (const id of ancestors) {
+        delete next[id];
+      }
+      return next;
+    });
+  }, [state?.activeRequestId, state?.collections]);
+
+  useEffect(() => {
+    if (!state?.activeRequestId) return;
+    const id = state.activeRequestId;
+    const t = window.setTimeout(() => {
+      document
+        .querySelector(`[data-tree-request-id="${id}"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [state?.activeRequestId, state?.collections]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const drag = sidebarResizeRef.current;
+      if (!drag) return;
+      const dx = e.clientX - drag.startX;
+      const w = Math.min(
+        MAX_SIDEBAR_WIDTH_PX,
+        Math.max(MIN_SIDEBAR_WIDTH_PX, drag.startW + dx)
+      );
+      setSidebarWidthPx(w);
+    };
+    const onUp = () => {
+      if (!sidebarResizeRef.current) return;
+      sidebarResizeRef.current = null;
+      setSidebarWidthPx((w) => {
+        try {
+          localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(w));
+        } catch {
+          /* ignore */
+        }
+        return w;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -697,6 +786,33 @@ export default function App() {
     });
   }, []);
 
+  const onTreeMoveNode = useCallback((nodeId: string, dest: MoveNodeDest) => {
+    setState((prev) => {
+      if (!prev) return prev;
+      const next = moveNode(prev.collections, nodeId, dest);
+      if (!next) return prev;
+      return { ...prev, collections: next };
+    });
+  }, []);
+
+  const onToggleFolderCollapsed = useCallback((folderId: string) => {
+    setCollapsedFolderIds((prev) => {
+      const next = { ...prev };
+      if (next[folderId]) delete next[folderId];
+      else next[folderId] = true;
+      return next;
+    });
+  }, []);
+
+  const onEnsureFolderExpanded = useCallback((folderId: string) => {
+    setCollapsedFolderIds((prev) => {
+      if (!prev[folderId]) return prev;
+      const next = { ...prev };
+      delete next[folderId];
+      return next;
+    });
+  }, []);
+
   const onMetaMenuContextMenu = useCallback((e: ReactMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -855,7 +971,12 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      style={{
+        gridTemplateColumns: `${sidebarWidthPx}px 5px minmax(0, 1fr)`,
+      }}
+    >
       <aside className="sidebar" data-testid="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-header-brand">
@@ -889,49 +1010,76 @@ export default function App() {
             + Folder
           </button>
         </div>
-        <div className="tree">
-          {treeDraft?.mode === "new-folder" && treeDraft.parentId === null ? (
-            <TreeInlineNameRow
-              depth={0}
-              draft={treeDraft}
-              colonError={colonDraftError}
-              onChange={updateDraftValue}
-              onConfirm={commitTreeDraft}
-              onCancel={cancelTreeDraft}
-              variant="folder"
+        <div className="sidebar-tree-scroll" ref={treeScrollRef}>
+          <div className="tree">
+            {treeDraft?.mode === "new-folder" && treeDraft.parentId === null ? (
+              <TreeInlineNameRow
+                depth={0}
+                draft={treeDraft}
+                colonError={colonDraftError}
+                onChange={updateDraftValue}
+                onConfirm={commitTreeDraft}
+                onCancel={cancelTreeDraft}
+                variant="folder"
+              />
+            ) : null}
+            <TreeNodes
+              nodes={state.collections}
+              activeId={state.activeRequestId}
+              treeMenu={treeContextMenu}
+              setTreeMenu={handleSetTreeMenu}
+              treeDraft={treeDraft}
+              colonDraftError={colonDraftError}
+              onDraftValueChange={updateDraftValue}
+              onDraftConfirm={commitTreeDraft}
+              onDraftCancel={cancelTreeDraft}
+              onSelectRequest={(id) =>
+                setState((s) => (s ? { ...s, activeRequestId: id } : s))
+              }
+              onExportFolder={onExportFolder}
+              onImportUnderFolder={onImportUnderFolder}
+              onRenameFolder={onRenameFolder}
+              onExportRequest={onExportRequest}
+              onRenameRequest={onRenameRequest}
+              onCreateFolderInFolder={onCreateFolderInFolder}
+              onCreateRequestInFolder={onCreateRequestInFolder}
+              onDeleteFolder={onDeleteFolder}
+              onDeleteRequest={onDeleteRequest}
+              collapsedFolderIds={collapsedFolderIds}
+              onToggleFolderCollapsed={onToggleFolderCollapsed}
+              onEnsureFolderExpanded={onEnsureFolderExpanded}
+              onMoveNode={onTreeMoveNode}
             />
-          ) : null}
-          <TreeNodes
-            nodes={state.collections}
-            activeId={state.activeRequestId}
-            treeMenu={treeContextMenu}
-            setTreeMenu={handleSetTreeMenu}
-            treeDraft={treeDraft}
-            colonDraftError={colonDraftError}
-            onDraftValueChange={updateDraftValue}
-            onDraftConfirm={commitTreeDraft}
-            onDraftCancel={cancelTreeDraft}
-            onSelectRequest={(id) =>
-              setState((s) => (s ? { ...s, activeRequestId: id } : s))
-            }
-            onExportFolder={onExportFolder}
-            onImportUnderFolder={onImportUnderFolder}
-            onRenameFolder={onRenameFolder}
-            onExportRequest={onExportRequest}
-            onRenameRequest={onRenameRequest}
-            onCreateFolderInFolder={onCreateFolderInFolder}
-            onCreateRequestInFolder={onCreateRequestInFolder}
-            onDeleteFolder={onDeleteFolder}
-            onDeleteRequest={onDeleteRequest}
-          />
+          </div>
         </div>
         {paths ? (
-          <div className="path-hint" title={paths.collectionsFile}>
-            Saved: {paths.collectionsFile}
+          <div className="path-hint">
+            <span className="path-hint-label">Saved:</span>{" "}
+            {isTauri() ? (
+              <button
+                type="button"
+                className="path-hint-link"
+                title={paths.collectionsFile}
+                onClick={() => void openContainingFolder(paths.collectionsFile)}
+              >
+                {paths.collectionsFile}
+              </button>
+            ) : (
+              <span title={paths.collectionsFile}>{paths.collectionsFile}</span>
+            )}
           </div>
         ) : null}
       </aside>
-
+      <div
+        className="sidebar-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize collections panel"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          sidebarResizeRef.current = { startX: e.clientX, startW: sidebarWidthPx };
+        }}
+      />
       <main className="main">
         <div className="toolbar">
           <select
@@ -1214,7 +1362,10 @@ export default function App() {
           )}
         </div>
 
-        <div className="response-panel" data-testid="response-panel">
+        <div
+          className={`response-panel${response ? " response-panel--populated" : ""}`}
+          data-testid="response-panel"
+        >
           <div className="response-header">
             {response ? (
               <>

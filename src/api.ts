@@ -190,3 +190,9 @@ export async function getPaths(): Promise<{
   }
   return invoke("get_paths");
 }
+
+/** Desktop only: opens the directory containing the given file path in the system file manager. */
+export async function openContainingFolder(path: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("open_containing_folder", { path });
+}

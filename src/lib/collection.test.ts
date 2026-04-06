@@ -6,9 +6,14 @@ import {
   appendRootFolder,
   createFolderNode,
   createRequestItem,
+  extractNode,
+  findAncestorFolderIdsForRequest,
   findRequest,
   firstRequestId,
+  insertChildAt,
+  isDescendantOfFolder,
   mapCollection,
+  moveNode,
   removeNodeById,
   renameFolderById,
   requestToNode,
@@ -99,5 +104,80 @@ describe("collection helpers", () => {
     const n = requestToNode(r);
     expect(n.nodeType).toBe("request");
     if (n.nodeType === "request") expect(n.name).toBe("X");
+  });
+
+  it("finds ancestor folder ids for a request", () => {
+    expect(findAncestorFolderIdsForRequest(sample, "r1")).toEqual(["f1"]);
+  });
+
+  it("detects folder descendants", () => {
+    const nested: CollectionNode[] = [
+      {
+        nodeType: "folder",
+        id: "a",
+        name: "A",
+        children: [
+          {
+            nodeType: "folder",
+            id: "b",
+            name: "B",
+            children: [],
+          },
+        ],
+      },
+    ];
+    expect(isDescendantOfFolder(nested, "a", "b")).toBe(true);
+    expect(isDescendantOfFolder(nested, "b", "a")).toBe(false);
+  });
+
+  it("moves a request within the same parent", () => {
+    const two: CollectionNode[] = [
+      {
+        nodeType: "folder",
+        id: "f1",
+        name: "Root",
+        children: [
+          {
+            nodeType: "request",
+            id: "r1",
+            name: "A",
+            environmentId: "e0",
+            method: "GET",
+            url: "",
+            headers: [],
+            queryParams: [],
+            body: "",
+            bodyType: "none",
+            auth: { type: "none" },
+            script: "",
+          },
+          {
+            nodeType: "request",
+            id: "r2",
+            name: "B",
+            environmentId: "e0",
+            method: "GET",
+            url: "",
+            headers: [],
+            queryParams: [],
+            body: "",
+            bodyType: "none",
+            auth: { type: "none" },
+            script: "",
+          },
+        ],
+      },
+    ];
+    const moved = moveNode(two, "r2", { parentId: "f1", index: 0 });
+    expect(moved).not.toBeNull();
+    if (!moved?.[0] || moved[0].nodeType !== "folder") throw new Error("expected folder");
+    expect(moved[0].children.map((c) => c.id)).toEqual(["r2", "r1"]);
+  });
+
+  it("extract and insert round-trip", () => {
+    const ex = extractNode(sample, "r1");
+    expect(ex.node?.nodeType).toBe("request");
+    const back = insertChildAt(ex.nodes, "f1", 0, ex.node!);
+    expect(findRequest(back, "r1")?.name).toBe("A");
   });
 });

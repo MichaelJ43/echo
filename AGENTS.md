@@ -23,7 +23,7 @@
 | `src/App.tsx` | Main UI: collection tree, request editor, response, environments. |
 | `src/api.ts` | Tauri `invoke` + `isTauri()`; browser fallbacks when not in the webview. |
 | `src-tauri/src/main.rs` | Rust binary entry; calls `echo_lib::run()`. |
-| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`**, **`list_secret_keys` / `set_secret` / `delete_secret`** (OS keychain). |
+| `src-tauri/src/lib.rs` | Tauri builder, plugins (`dialog`, `updater`, `process`), `invoke_handler` for load/save state, HTTP, import/export paths, **`open_external_url`**, **`open_containing_folder`** (reveal workspace file in system file manager), **`list_secret_keys` / `set_secret` / `delete_secret`** (OS keychain). |
 | `src/lib/updater.ts` | Desktop-only: `check` + `downloadAndInstall` + `relaunch`; scheduled on app load + hourly; **`openGitHubReleasesPage`** uses `invoke("open_external_url")` in Tauri (WebView `window.open` is unreliable). |
 | `src-tauri/src/http_client.rs` | `reqwest` request execution (**TLS:** `rustls-tls-native-roots` so the OS trust store is used, e.g. Windows Schannel-backed roots); shared `Client` with a stable **User-Agent** (`Echo/<version>`); env substitution `{{name}}`, then `{{secret:NAME}}` from keychain at send time; masks secret values in outbound error strings. |
 | `src-tauri/src/secrets.rs` | OS credential store (`keyring` crate) + `secret_index.json` (key names only, app data dir). |

@@ -8,6 +8,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 vi.mock("./api", () => ({
+  openContainingFolder: vi.fn(),
   loadState: vi.fn(async () => ({
     version: 1,
     environments: [{ id: "e1", name: "Default", variables: [] }],

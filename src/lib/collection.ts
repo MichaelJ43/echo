@@ -94,6 +94,20 @@ export function findRequest(
   return null;
 }
 
+export function findNodeById(
+  nodes: CollectionNode[],
+  id: string
+): CollectionNode | null {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    if (n.nodeType === "folder") {
+      const inner = findNodeById(n.children, id);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
 export function mapEveryRequest(
   nodes: CollectionNode[],
   fn: (r: RequestItem) => RequestItem
@@ -171,4 +185,146 @@ export function allRequestIds(nodes: CollectionNode[]): Set<string> {
   };
   walk(nodes);
   return ids;
+}
+
+function containsNodeId(nodes: CollectionNode[], id: string): boolean {
+  for (const n of nodes) {
+    if (n.id === id) return true;
+    if (n.nodeType === "folder" && containsNodeId(n.children, id)) return true;
+  }
+  return false;
+}
+
+/** True if `maybeDescendantId` appears in the subtree of the folder `ancestorFolderId`. */
+export function isDescendantOfFolder(
+  nodes: CollectionNode[],
+  ancestorFolderId: string,
+  maybeDescendantId: string
+): boolean {
+  for (const n of nodes) {
+    if (n.nodeType === "folder" && n.id === ancestorFolderId) {
+      return containsNodeId(n.children, maybeDescendantId);
+    }
+    if (n.nodeType === "folder") {
+      if (isDescendantOfFolder(n.children, ancestorFolderId, maybeDescendantId)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Folder ids from root down to the parent of the given request (empty if request is at root). */
+export function findAncestorFolderIdsForRequest(
+  nodes: CollectionNode[],
+  requestId: string,
+  prefix: string[] = []
+): string[] | null {
+  for (const n of nodes) {
+    if (n.nodeType === "request" && n.id === requestId) return prefix;
+    if (n.nodeType === "folder") {
+      const inner = findAncestorFolderIdsForRequest(n.children, requestId, [
+        ...prefix,
+        n.id,
+      ]);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+export function findNodeLocation(
+  nodes: CollectionNode[],
+  id: string,
+  parentId: string | null = null
+): { parentId: string | null; index: number } | null {
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.id === id) return { parentId, index: i };
+    if (n.nodeType === "folder") {
+      const inner = findNodeLocation(n.children, id, n.id);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+/** Removes the first node with `id` and returns it with the updated tree. */
+export function extractNode(
+  nodes: CollectionNode[],
+  id: string
+): { node: CollectionNode | null; nodes: CollectionNode[] } {
+  const out: CollectionNode[] = [];
+  let extracted: CollectionNode | null = null;
+  for (const n of nodes) {
+    if (n.id === id) {
+      extracted = n;
+      continue;
+    }
+    if (n.nodeType === "folder") {
+      const inner = extractNode(n.children, id);
+      if (inner.node) {
+        extracted = inner.node;
+        out.push({ ...n, children: inner.nodes });
+      } else {
+        out.push(n);
+      }
+    } else {
+      out.push(n);
+    }
+  }
+  return { node: extracted, nodes: out };
+}
+
+export function insertChildAt(
+  nodes: CollectionNode[],
+  parentId: string | null,
+  index: number,
+  child: CollectionNode
+): CollectionNode[] {
+  if (parentId === null) {
+    const next = [...nodes];
+    next.splice(index, 0, child);
+    return next;
+  }
+  return nodes.map((n) => {
+    if (n.nodeType !== "folder") return n;
+    if (n.id === parentId) {
+      const ch = [...n.children];
+      ch.splice(index, 0, child);
+      return { ...n, children: ch };
+    }
+    return { ...n, children: insertChildAt(n.children, parentId, index, child) };
+  });
+}
+
+/**
+ * Moves a node to `dest` in the parent's children array (`index` is the splice index).
+ * Returns null if the move is invalid (e.g. folder into its own descendant).
+ */
+export function moveNode(
+  nodes: CollectionNode[],
+  nodeId: string,
+  dest: { parentId: string | null; index: number }
+): CollectionNode[] | null {
+  const from = findNodeLocation(nodes, nodeId);
+  if (!from) return null;
+
+  const target = findNodeById(nodes, nodeId);
+  if (!target) return null;
+  if (target.nodeType === "folder" && dest.parentId !== null) {
+    if (dest.parentId === nodeId) return null;
+    if (isDescendantOfFolder(nodes, nodeId, dest.parentId)) return null;
+  }
+
+  const extracted = extractNode(nodes, nodeId);
+  if (!extracted.node) return null;
+  const { node, nodes: without } = extracted;
+
+  let idx = dest.index;
+  if (from.parentId === dest.parentId && from.index < dest.index) {
+    idx = dest.index - 1;
+  }
+
+  return insertChildAt(without, dest.parentId, idx, node);
 }
