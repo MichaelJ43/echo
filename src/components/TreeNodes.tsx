@@ -10,6 +10,7 @@ import {
   useState,
   type CSSProperties,
   type DragEvent,
+  type MutableRefObject,
   type MouseEventHandler,
   type MouseEvent,
   type ReactNode,
@@ -34,11 +35,19 @@ type DropTarget =
 
 type DnDContextValue = {
   draggingId: string | null;
+  /** Set synchronously in drag handlers so dragover can preventDefault before React re-renders. */
+  draggingIdRef: MutableRefObject<string | null>;
   setDraggingId: (id: string | null) => void;
   dropTarget: DropTarget | null;
   setDropTarget: (t: DropTarget | null) => void;
   onMoveNode: (nodeId: string, dest: MoveNodeDest) => void;
 };
+
+function isOurTreeDrag(ctx: DnDContextValue, e: DragEvent): boolean {
+  if (ctx.draggingIdRef.current) return true;
+  if (ctx.draggingId) return true;
+  return Array.from(e.dataTransfer.types).includes("text/plain");
+}
 
 const TreeDnDContext = createContext<DnDContextValue | null>(null);
 
@@ -72,18 +81,25 @@ type Props = {
 };
 
 export function TreeNodes(props: Props) {
-  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [draggingId, setDraggingIdState] = useState<string | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+
+  const setDraggingId = useCallback((id: string | null) => {
+    draggingIdRef.current = id;
+    setDraggingIdState(id);
+  }, []);
 
   const ctx = useMemo<DnDContextValue>(
     () => ({
       draggingId,
+      draggingIdRef,
       setDraggingId,
       dropTarget,
       setDropTarget,
       onMoveNode: props.onMoveNode,
     }),
-    [draggingId, dropTarget, props.onMoveNode]
+    [draggingId, setDraggingId, dropTarget, props.onMoveNode]
   );
 
   return (
@@ -189,10 +205,11 @@ function DropGap({
     <div
       className={`tree-drop-gap${active ? " tree-drop-gap--active" : ""}`}
       onDragOver={(e: DragEvent) => {
-        if (!ctx.draggingId) return;
+        if (!ctx || !isOurTreeDrag(ctx, e)) return;
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = "move";
+        if (!ctx.draggingIdRef.current && !ctx.draggingId) return;
         ctx.setDropTarget({ kind: "between", parentId, beforeIndex });
       }}
       onDragLeave={(e) => {
@@ -358,9 +375,11 @@ function TreeNode({
             ctx?.setDropTarget(null);
           }}
           onDragOver={(e) => {
-            if (!ctx?.draggingId || ctx.draggingId === node.id) return;
+            if (!ctx || !isOurTreeDrag(ctx, e)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
+            const dragSource = ctx.draggingIdRef.current ?? ctx.draggingId;
+            if (!dragSource || dragSource === node.id) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const y = e.clientY - rect.top;
             const mid = y / rect.height;

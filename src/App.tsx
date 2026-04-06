@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { isTauri } from "@tauri-apps/api/core";
@@ -268,16 +275,18 @@ export default function App() {
     });
   }, [state?.activeRequestId, state?.collections]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!state?.activeRequestId) return;
     const id = state.activeRequestId;
-    const t = window.setTimeout(() => {
-      document
-        .querySelector(`[data-tree-request-id="${id}"]`)
-        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }, 0);
-    return () => clearTimeout(t);
-  }, [state?.activeRequestId, state?.collections]);
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-tree-request-id="${id}"]`)
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [state?.activeRequestId, state?.collections, collapsedFolderIds]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
