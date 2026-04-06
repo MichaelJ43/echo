@@ -7,6 +7,17 @@ use std::sync::OnceLock;
 use std::time::Instant;
 use url::Url;
 
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::limited(10))
+            .user_agent(concat!("Echo/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .expect("reqwest HTTP client")
+    })
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpRequestConfig {
@@ -133,10 +144,7 @@ fn build_base_url(
 pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePayload, String> {
     let mut mask_acc: Vec<String> = Vec::new();
 
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()
-        .map_err(|e| mask_for_log(&e.to_string(), &mask_acc))?;
+    let client = http_client();
 
     let mut url = build_base_url(
         &config.url,
@@ -163,7 +171,7 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     let method = reqwest::Method::from_bytes(config.method.as_bytes())
         .map_err(|e| mask_for_log(&format!("Invalid method: {e}"), &mask_acc))?;
 
-    let mut req = client.request(method, url);
+    let mut req = client.clone().request(method, url);
 
     for h in &config.headers {
         if !h.enabled || h.key.is_empty() {
