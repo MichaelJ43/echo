@@ -87,7 +87,7 @@ CONTRIBUTING.md             # entry point → docs/contributors.md, security, Co
 - **Authoritative doc:** **`docs/design.md`** — theme intent, color tokens, typography, spacing, layout (sidebar width, sections), and component patterns.
 - **Code:** **`src/App.css`** defines `:root` variables and most layout/component styles; new surfaces should **use those variables** rather than one-off colors.
 - **Maintenance:** Changes that alter the **global palette, spacing scale, or shell layout** must update **`docs/design.md`** and **§1 (Visual design)** above in the **same PR**.
-- **Environment entry placeholders** (active environment **Entries** table in `App.tsx`): key column **`name`**; Variable and Secret **value** inputs use lowercase **`value`** (including the secret “replace stored” hint); File **path** uses **`path`**.
+- **Environment entry placeholders** (active environment **Entries** table in `App.tsx`): key column **`name`**; Variable and Secret **value** inputs use lowercase **`value`** (including the secret “replace stored” hint); File **path** uses **`path`**. After a secret is saved (desktop), the row briefly shows **Saved** with success styling, then returns to **Stored** (see **`docs/design.md`**).
 
 ---
 

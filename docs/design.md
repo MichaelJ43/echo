@@ -70,6 +70,7 @@ Colors are centralized on **` :root`** in `src/App.css`. **Prefer these variable
 - **Form rows:** grids like `.kv-row` use **6px** gaps; inputs often **6px 8px** vertical padding inside fields.
 - **Environment entries:** `.env-entry-row` uses a **narrow** kind column (`minmax(6.5rem, 9rem)`), then **name** and **value** columns (`1fr` / `2fr`) so long paths get space; **6px** gap.
 - **Environment entry placeholders:** Use lowercase **`name`** (key), **`value`** (variable and secret value fields; secret replace hint **`new value (replaces stored)`**), and **`path`** (file path). Do not mix `Value` / `value` for the same role.
+- **Secret saved feedback:** After a secret value is persisted (desktop), the stored row shows a short **Saved** state (success tint on the control, then reverts to **Stored** after a few seconds).
 
 Keep new layouts **aligned to these multiples** (4 / 6 / 8 / 12) unless there is a strong reason to break rhythm.
 
