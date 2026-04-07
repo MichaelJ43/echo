@@ -44,6 +44,14 @@ pub struct BinaryBodyPayload {
     pub content_type: Option<String>,
 }
 
+/// Metadata for desktop request history (no URL/body; written to `request_history.log`).
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestLogContext {
+    pub request_id: String,
+    pub request_name: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpRequestConfig {
@@ -62,6 +70,8 @@ pub struct HttpRequestConfig {
     pub multipart_parts: Option<Vec<MultipartPartPayload>>,
     #[serde(default)]
     pub binary_body: Option<BinaryBodyPayload>,
+    #[serde(default)]
+    pub request_log: Option<RequestLogContext>,
 }
 
 #[derive(Debug, Serialize)]

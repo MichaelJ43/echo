@@ -27,6 +27,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Native stores per platform; `keyring` v3 has no default store (otherwise uses in-RAM mock).
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 regex = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

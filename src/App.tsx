@@ -81,6 +81,7 @@ import { composeSecretStorageKey } from "./lib/secretStorageKey";
 import { getEntryKind } from "./lib/variables";
 import { AboutDialog } from "./components/AboutDialog";
 import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfirmDialog";
+import { RequestLogDialog } from "./components/RequestLogDialog";
 import { OrphanCredentialsDialog } from "./components/OrphanCredentialsDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
@@ -93,6 +94,7 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import {
   fetchUpdateIfAvailable,
   openGitHubReleasesPage,
+  openSuggestFeedbackPage,
   recordSuppressUpdateNotificationsForever,
   recordUpdatePromptDismissed,
   startUpdateCheckScheduler,
@@ -145,7 +147,11 @@ function readInitialSidebarWidth(): number {
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
-  const [paths, setPaths] = useState<{ appDataDir: string; collectionsFile: string } | null>(null);
+  const [paths, setPaths] = useState<{
+    appDataDir: string;
+    collectionsFile: string;
+    requestHistoryLog: string;
+  } | null>(null);
   /** In-flight send for this request id — hide cached response until the round-trip finishes. */
   const [pendingSendRequestId, setPendingSendRequestId] = useState<string | null>(
     null
@@ -172,6 +178,7 @@ export default function App() {
     null
   );
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [requestLogOpen, setRequestLogOpen] = useState(false);
   const [importReplaceDialogOpen, setImportReplaceDialogOpen] = useState(false);
   const [lastResponses, setLastResponses] = useState<
     Record<string, HttpResponsePayload>
@@ -2431,6 +2438,27 @@ export default function App() {
           <div className="context-menu-sep" role="separator" />
           <button
             type="button"
+            data-testid="meta-menu-request-log"
+            onClick={() => {
+              setMetaMenu(null);
+              setRequestLogOpen(true);
+            }}
+          >
+            Request log…
+          </button>
+          <button
+            type="button"
+            data-testid="meta-menu-suggest-feedback"
+            onClick={() => {
+              setMetaMenu(null);
+              void openSuggestFeedbackPage();
+            }}
+          >
+            Suggest feedback
+          </button>
+          <div className="context-menu-sep" role="separator" />
+          <button
+            type="button"
             data-testid="meta-menu-about"
             onClick={() => {
               setMetaMenu(null);
@@ -2442,6 +2470,10 @@ export default function App() {
         </div>
       ) : null}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <RequestLogDialog
+        open={requestLogOpen}
+        onClose={() => setRequestLogOpen(false)}
+      />
       <ImportWorkspaceConfirmDialog
         open={importReplaceDialogOpen}
         onClose={() => setImportReplaceDialogOpen(false)}

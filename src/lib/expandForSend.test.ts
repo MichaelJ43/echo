@@ -54,6 +54,7 @@ describe("buildExpandedSendPayload", () => {
     expect(payload.multipartParts?.[0]?.key).toBe("khello");
     expect(payload.multipartParts?.[0]?.text).toBe("vhello");
     expect(payload.environmentId).toBe(TEST_ENV_ID);
+    expect(payload.requestLog).toEqual({ requestId: "r1", requestName: "t" });
   });
 
   it("expands binary body path and content type", () => {

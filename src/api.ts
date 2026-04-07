@@ -27,6 +27,18 @@ export type SendRequestPayload = {
   environmentId: string;
   multipartParts?: MultipartPart[];
   binaryBody?: BinaryBody;
+  /** Desktop: metadata-only row in `request_history.log` (omitted in web send). */
+  requestLog?: { requestId: string; requestName: string };
+};
+
+export type RequestLogEntry = {
+  ts: string;
+  requestId: string;
+  requestName: string;
+  method: string;
+  status: number | null;
+  durationMs: number;
+  error?: string;
 };
 
 function substituteUrl(s: string, vars: Record<string, string>): string {
@@ -266,14 +278,31 @@ export async function exportWorkspaceFile(
 export async function getPaths(): Promise<{
   appDataDir: string;
   collectionsFile: string;
+  requestHistoryLog: string;
 }> {
   if (!isTauri()) {
     return {
       appDataDir: "(browser)",
       collectionsFile: "(localStorage)",
+      requestHistoryLog: "(n/a)",
     };
   }
   return invoke("get_paths");
+}
+
+export async function getRequestLogEntries(): Promise<RequestLogEntry[]> {
+  if (!isTauri()) return [];
+  return invoke<RequestLogEntry[]>("get_request_log_entries");
+}
+
+export async function getRequestLogSettings(): Promise<{ maxEntries: number }> {
+  if (!isTauri()) return { maxEntries: 500 };
+  return invoke("get_request_log_settings");
+}
+
+export async function setRequestLogMaxEntries(maxEntries: number): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_request_log_max_entries", { maxEntries });
 }
 
 /** Desktop only: opens the directory containing the given file path in the system file manager. */
