@@ -41,7 +41,28 @@ export type SendRequestPayloadLike = {
   headers: KeyValue[];
   queryParams: KeyValue[];
   auth: AuthConfig;
+  multipartParts?: {
+    key: string;
+    text?: string;
+    filePath?: string;
+    fileName?: string;
+  }[];
+  binaryBody?: { path: string; contentType: string };
 };
+
+function multipartStrings(
+  parts: SendRequestPayloadLike["multipartParts"]
+): string[] {
+  if (!parts?.length) return [];
+  const out: string[] = [];
+  for (const p of parts) {
+    out.push(p.key);
+    if (p.text !== undefined) out.push(p.text);
+    if (p.filePath !== undefined) out.push(p.filePath);
+    if (p.fileName !== undefined) out.push(p.fileName);
+  }
+  return out;
+}
 
 /** True if any outbound field references a local secret (desktop-only resolution). */
 export function payloadContainsSecretPlaceholder(
@@ -53,6 +74,10 @@ export function payloadContainsSecretPlaceholder(
     ...kvStrings(payload.headers),
     ...kvStrings(payload.queryParams),
     ...authStrings(payload.auth),
+    ...multipartStrings(payload.multipartParts),
   ];
+  if (payload.binaryBody) {
+    parts.push(payload.binaryBody.path, payload.binaryBody.contentType);
+  }
   return parts.some((s) => textContainsSecretPlaceholder(s));
 }

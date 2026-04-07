@@ -30,6 +30,7 @@ export function createDefaultState(): AppState {
             queryParams: [],
             body: "",
             bodyType: "none",
+            multipartParts: [],
             auth: { type: "none" },
             script: "",
           },

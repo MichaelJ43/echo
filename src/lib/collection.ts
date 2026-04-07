@@ -25,6 +25,7 @@ export function createRequestItem(name: string, environmentId: string): RequestI
     queryParams: [],
     body: "",
     bodyType: "none",
+    multipartParts: [],
     auth: { type: "none" },
     script: "",
   };
