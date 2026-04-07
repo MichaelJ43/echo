@@ -623,11 +623,7 @@ export default function App() {
   );
 
   const commitSecretValueAtRow = useCallback(
-    async (
-      logicalKey: string,
-      valueTrimmed: string,
-      wasStored: boolean
-    ) => {
+    async (logicalKey: string, valueTrimmed: string) => {
       if (!activeEnv || !isTauri()) return;
       const key = logicalKey.trim();
       if (!key) {
@@ -639,11 +635,8 @@ export default function App() {
       const composed = composeSecretStorageKey(activeEnv.id, key);
       try {
         if (!valueTrimmed) {
-          if (wasStored) {
-            await deleteSecret(composed);
-            await deleteSecret(key).catch(() => {});
-            setStoredSecretLogicalNames((prev) => prev.filter((x) => x !== key));
-          }
+          // Empty blur is cancel (escape / click away), not "remove secret".
+          // Do not delete keychain entries here; remove the row or change kind to clear.
         } else {
           await setSecret(composed, valueTrimmed);
           setStoredSecretLogicalNames((prev) =>
@@ -1604,12 +1597,16 @@ export default function App() {
                                 if (e.key === "Enter") {
                                   e.currentTarget.blur();
                                 }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setSecretEditRowIndex(null);
+                                  setSecretValueDraft("");
+                                }
                               }}
                               onBlur={(e) => {
                                 void commitSecretValueAtRow(
                                   row.key,
-                                  e.currentTarget.value.trim(),
-                                  storedSecretLogicalNames.includes(row.key)
+                                  e.currentTarget.value.trim()
                                 );
                               }}
                             />
@@ -1650,8 +1647,7 @@ export default function App() {
                               onBlur={(e) => {
                                 void commitSecretValueAtRow(
                                   row.key,
-                                  e.currentTarget.value.trim(),
-                                  false
+                                  e.currentTarget.value.trim()
                                 );
                               }}
                             />
