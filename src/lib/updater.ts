@@ -13,6 +13,10 @@ export const GITHUB_RELEASES_LATEST_URL = "https://github.com/MichaelJ43/echo/re
 
 export const GITHUB_REPO_URL = "https://github.com/MichaelJ43/echo";
 
+/** GitHub “Feature request” issue form (feedback and ideas). */
+export const GITHUB_FEATURE_REQUEST_URL =
+  "https://github.com/MichaelJ43/echo/issues/new?template=feature_request.yml";
+
 function readSuppress(): boolean {
   try {
     return localStorage.getItem(LS_SUPPRESS) === "1";
@@ -87,6 +91,14 @@ export async function openGitHubRepoPage(): Promise<void> {
     return;
   }
   window.open(GITHUB_REPO_URL, "_blank", "noopener,noreferrer");
+}
+
+export async function openSuggestFeedbackPage(): Promise<void> {
+  if (isTauri()) {
+    await invoke("open_external_url", { url: GITHUB_FEATURE_REQUEST_URL });
+    return;
+  }
+  window.open(GITHUB_FEATURE_REQUEST_URL, "_blank", "noopener,noreferrer");
 }
 
 export type UpdateCheckScheduler = {

@@ -5,6 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
+        **Echo** is a desktop API client (collections, environments, HTTP requests). Use this form for **ideas and product feedback**—not security issues ([Security advisories](https://github.com/MichaelJ43/echo/security/advisories/new)) or routine bugs (use **Bug report**).
+
         Share what you’d like Echo to do and why it matters for your workflow.
 
   - type: textarea

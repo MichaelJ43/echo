@@ -11,4 +11,7 @@ commands.allow = [
   "import_workspace_file",
   "export_workspace_file",
   "open_containing_folder",
+  "get_request_log_entries",
+  "get_request_log_settings",
+  "set_request_log_max_entries",
 ]

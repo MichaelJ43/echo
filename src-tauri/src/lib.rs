@@ -1,25 +1,30 @@
 mod http_client;
 mod persistence;
+mod request_log;
 mod secrets;
 
 use persistence::{export_to_path, import_from_path, load_workspace, save_workspace, AppState};
 use serde::Serialize;
 use std::path::Path;
+use std::time::Instant;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppPaths {
     app_data_dir: String,
     collections_file: String,
+    request_history_log: String,
 }
 
 #[tauri::command]
 fn get_paths(app: tauri::AppHandle) -> Result<AppPaths, String> {
     let dir = persistence::app_data_dir(&app)?;
     let collections = dir.join("collections.json");
+    let request_history = dir.join("request_history.log");
     Ok(AppPaths {
         app_data_dir: dir.to_string_lossy().into_owned(),
         collections_file: collections.to_string_lossy().into_owned(),
+        request_history_log: request_history.to_string_lossy().into_owned(),
     })
 }
 
@@ -35,9 +40,18 @@ fn save_state(app: tauri::AppHandle, state: AppState) -> Result<(), String> {
 
 #[tauri::command]
 async fn send_http_request(
+    app: tauri::AppHandle,
     config: http_client::HttpRequestConfig,
 ) -> Result<http_client::HttpResponsePayload, String> {
-    http_client::send_request(config).await
+    let ctx = config.request_log.clone();
+    let method = config.method.clone();
+    let start = Instant::now();
+    let result = http_client::send_request(config).await;
+    let duration_ms = start.elapsed().as_millis() as u64;
+    if let Some(c) = ctx {
+        request_log::record_send_outcome(&app, &c, &method, duration_ms, &result);
+    }
+    result
 }
 
 #[tauri::command]
@@ -114,6 +128,30 @@ fn resolve_secret_placeholder_rows(
     secrets::resolve_secret_placeholder_rows(rows)
 }
 
+#[tauri::command]
+fn get_request_log_entries(app: tauri::AppHandle) -> Result<Vec<request_log::RequestLogEntry>, String> {
+    request_log::read_entries_newest_first(&app)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestLogSettingsPayload {
+    max_entries: u32,
+}
+
+#[tauri::command]
+fn get_request_log_settings(app: tauri::AppHandle) -> Result<RequestLogSettingsPayload, String> {
+    Ok(RequestLogSettingsPayload {
+        max_entries: request_log::load_max_entries(&app),
+    })
+}
+
+#[tauri::command]
+fn set_request_log_max_entries(app: tauri::AppHandle, max_entries: u32) -> Result<(), String> {
+    request_log::save_max_entries(&app, max_entries)?;
+    request_log::trim_file_to_max(&app)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -136,7 +174,10 @@ pub fn run() {
             set_secret,
             delete_secret,
             delete_secrets_for_environment,
-            resolve_secret_placeholder_rows
+            resolve_secret_placeholder_rows,
+            get_request_log_entries,
+            get_request_log_settings,
+            set_request_log_max_entries
         ])
         .setup(|app| {
             let handle = app.handle().clone();

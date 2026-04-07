@@ -44,7 +44,11 @@ vi.mock("./api", () => ({
   getPaths: vi.fn(async () => ({
     appDataDir: "/tmp",
     collectionsFile: "/tmp/collections.json",
+    requestHistoryLog: "/tmp/request_history.log",
   })),
+  getRequestLogEntries: vi.fn(async () => []),
+  getRequestLogSettings: vi.fn(async () => ({ maxEntries: 500 })),
+  setRequestLogMaxEntries: vi.fn(),
   importWorkspaceFile: vi.fn(),
   exportWorkspaceFile: vi.fn(),
   listSecretLogicalNamesForEnvironment: vi.fn(async () => []),

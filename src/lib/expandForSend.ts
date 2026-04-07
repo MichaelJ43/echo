@@ -115,6 +115,7 @@ export function buildExpandedSendPayload(
     auth: expandAuth(req.auth, exp),
     variables: variablesToMap(variables),
     environmentId: env.id,
+    requestLog: { requestId: req.id, requestName: req.name },
   };
 
   if (req.bodyType === "multipart" && req.multipartParts?.length) {
