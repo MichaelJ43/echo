@@ -24,7 +24,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 url = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
-keyring = "3"
+# Native stores per platform; `keyring` v3 has no default store (otherwise uses in-RAM mock).
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 regex = "1"
 
 [dev-dependencies]
