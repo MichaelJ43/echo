@@ -4,6 +4,7 @@
 //! New keys use `echo_<environmentId>_<logicalName>` (UUID environment id). Legacy bare
 //! logical names are still read for one release (`get_secret_for_placeholder`).
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -175,6 +176,39 @@ pub fn list_secret_logical_names_for_env(
         .collect();
     out.sort();
     out.dedup();
+    Ok(out)
+}
+
+/// One environment secret row to check against the OS store (same resolution as HTTP `{{secret:NAME}}`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretPlaceholderRowInput {
+    pub environment_id: String,
+    pub logical_name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretPlaceholderResolution {
+    pub environment_id: String,
+    pub logical_name: String,
+    /// `true` if `get_secret_for_placeholder` succeeds (composed or legacy keychain entry).
+    pub ok: bool,
+}
+
+/// Batch-check whether each secret row can be resolved from the credential store (desktop sync).
+pub fn resolve_secret_placeholder_rows(
+    rows: Vec<SecretPlaceholderRowInput>,
+) -> Result<Vec<SecretPlaceholderResolution>, String> {
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let ok = get_secret_for_placeholder(&row.environment_id, &row.logical_name).is_ok();
+        out.push(SecretPlaceholderResolution {
+            environment_id: row.environment_id,
+            logical_name: row.logical_name,
+            ok,
+        });
+    }
     Ok(out)
 }
 

@@ -8,6 +8,7 @@
   --muted: #8b949e;
   --accent: #58a6ff;
   --danger: #f85149;
+  --warning: #d29922;
   --success: #3fb950;
   font-family:
     "Segoe UI",
@@ -567,6 +568,69 @@ body,
 .env-entry-secret-hint--saved {
   color: var(--success);
   font-weight: 600;
+}
+
+/** Secret row: credential missing from OS store (secret sync). */
+.env-entry-secret--missing {
+  border-color: rgba(210, 153, 34, 0.75);
+  background: rgba(210, 153, 34, 0.08);
+}
+
+.env-entry-secret-stored-btn--missing:not(.env-entry-secret-stored-btn--saved) {
+  border-color: rgba(210, 153, 34, 0.65);
+  background: rgba(210, 153, 34, 0.1);
+}
+
+.orphan-credentials-dialog .orphan-credentials-select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.orphan-credentials-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(50vh, 320px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.orphan-credentials-list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.orphan-credentials-list li:last-child {
+  border-bottom: none;
+}
+
+.orphan-credentials-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.orphan-credentials-row input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.orphan-credentials-key {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .sr-only {
