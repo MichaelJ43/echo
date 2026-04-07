@@ -2433,7 +2433,7 @@ export default function App() {
               setImportReplaceDialogOpen(true);
             }}
           >
-            Import workspace…
+            Import workspace
           </button>
           <div className="context-menu-sep" role="separator" />
           <button
@@ -2444,7 +2444,7 @@ export default function App() {
               setRequestLogOpen(true);
             }}
           >
-            Request log…
+            Request log
           </button>
           <button
             type="button"
