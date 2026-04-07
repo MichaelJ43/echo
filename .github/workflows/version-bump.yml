@@ -33,7 +33,7 @@ jobs:
       # Pushes made with GITHUB_TOKEN do not trigger other workflows. We still use a PAT for `git push`
       # so commits/tags appear as a normal user push. The Release workflow is started explicitly via
       # workflow_dispatch (see "Dispatch Release" below)—tag push alone is unreliable for triggering CI.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
@@ -50,9 +50,9 @@ jobs:
           fi
           git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
