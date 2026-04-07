@@ -1778,9 +1778,26 @@ export default function App() {
                           className="env-entry-remove-btn"
                           title="Remove"
                           onClick={() => {
-                            const vars = (activeEnv?.variables ?? []).filter(
-                              (_, j) => j !== i
-                            );
+                            const varsList = activeEnv?.variables ?? [];
+                            const removed = varsList[i];
+                            if (removed && getEntryKind(removed) === "secret") {
+                              removeStoredSecretForLogicalKey(removed.key);
+                            }
+                            setSecretJustSavedRowIndex((cur) => {
+                              if (cur === null) return null;
+                              if (cur === i) return null;
+                              if (cur > i) return cur - 1;
+                              return cur;
+                            });
+                            if (secretEditRowIndex === i) {
+                              setSecretEditRowIndex(null);
+                              setSecretValueDraft("");
+                            } else {
+                              setSecretEditRowIndex((cur) =>
+                                cur !== null && cur > i ? cur - 1 : cur
+                              );
+                            }
+                            const vars = varsList.filter((_, j) => j !== i);
                             setState((s) => {
                               if (!s || !activeEnv) return s;
                               return {
