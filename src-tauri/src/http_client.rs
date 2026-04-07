@@ -3,9 +3,13 @@ use crate::secrets;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::OnceLock;
 use std::time::Instant;
 use url::Url;
+
+/// Max bytes read from disk for multipart/binary bodies (single-part cap).
+const MAX_HTTP_BODY_BYTES: u64 = 50 * 1024 * 1024;
 
 fn http_client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -20,6 +24,28 @@ fn http_client() -> &'static reqwest::Client {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MultipartPartPayload {
+    pub enabled: bool,
+    pub key: String,
+    pub part_kind: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    #[serde(default)]
+    pub file_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BinaryBodyPayload {
+    pub path: String,
+    #[serde(default)]
+    pub content_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HttpRequestConfig {
     pub method: String,
     pub url: String,
@@ -29,6 +55,10 @@ pub struct HttpRequestConfig {
     pub body_type: String,
     pub auth: AuthConfig,
     pub variables: HashMap<String, String>,
+    #[serde(default)]
+    pub multipart_parts: Option<Vec<MultipartPartPayload>>,
+    #[serde(default)]
+    pub binary_body: Option<BinaryBodyPayload>,
 }
 
 #[derive(Debug, Serialize)]
@@ -214,6 +244,83 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     }
 
     req = match config.body_type.as_str() {
+        "multipart" => {
+            let parts = config
+                .multipart_parts
+                .as_ref()
+                .ok_or_else(|| "multipart body requires multipartParts".to_string())?;
+            let mut form = reqwest::multipart::Form::new();
+            for p in parts {
+                if !p.enabled || p.key.trim().is_empty() {
+                    continue;
+                }
+                let (key, sec_k) = substitute_env_and_secrets(&p.key, &config.variables)?;
+                merge_secret_vecs(&mut mask_acc, sec_k);
+                match p.part_kind.as_str() {
+                    "text" => {
+                        let raw = p.text.as_deref().unwrap_or("");
+                        let (text, sec) = substitute_env_and_secrets(raw, &config.variables)?;
+                        merge_secret_vecs(&mut mask_acc, sec);
+                        form = form.text(key, text);
+                    }
+                    "file" => {
+                        let path_raw = p.file_path.as_ref().ok_or_else(|| {
+                            "Multipart file part missing filePath.".to_string()
+                        })?;
+                        let (path_res, sec) = substitute_env_and_secrets(path_raw, &config.variables)?;
+                        merge_secret_vecs(&mut mask_acc, sec);
+                        let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
+                            mask_for_log(
+                                &format!("Could not read multipart file: {e}"),
+                                &mask_acc,
+                            )
+                        })?;
+                        if bytes.len() as u64 > MAX_HTTP_BODY_BYTES {
+                            return Err("File exceeds maximum size (50 MiB).".to_string());
+                        }
+                        let fname = p
+                            .file_name
+                            .as_deref()
+                            .filter(|s| !s.is_empty())
+                            .or_else(|| {
+                                Path::new(&path_res)
+                                    .file_name()
+                                    .and_then(|s| s.to_str())
+                            })
+                            .unwrap_or("file");
+                        let part = reqwest::multipart::Part::bytes(bytes).file_name(fname.to_string());
+                        form = form.part(key, part);
+                    }
+                    _ => {}
+                }
+            }
+            req.multipart(form)
+        }
+        "binary" => {
+            let bb = config
+                .binary_body
+                .as_ref()
+                .ok_or_else(|| "binary body requires binaryBody".to_string())?;
+            let (path_res, sec) = substitute_env_and_secrets(&bb.path, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec);
+            let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
+                mask_for_log(
+                    &format!("Could not read binary body file: {e}"),
+                    &mask_acc,
+                )
+            })?;
+            if bytes.len() as u64 > MAX_HTTP_BODY_BYTES {
+                return Err("File exceeds maximum size (50 MiB).".to_string());
+            }
+            let ct_raw = bb
+                .content_type
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .unwrap_or("application/octet-stream");
+            let (ct_exp, sec_ct) = substitute_env_and_secrets(ct_raw, &config.variables)?;
+            merge_secret_vecs(&mut mask_acc, sec_ct);
+            req.header(reqwest::header::CONTENT_TYPE, ct_exp).body(bytes)
+        }
         "json" | "raw" if !config.body.is_empty() => {
             let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables)?;
             merge_secret_vecs(&mut mask_acc, sec);

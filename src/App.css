@@ -445,6 +445,76 @@ body,
   color: var(--danger);
 }
 
+.multipart-parts-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.multipart-part-row {
+  display: grid;
+  grid-template-columns: 22px minmax(72px, 1fr) minmax(4.5rem, 5.5rem) minmax(
+      0,
+      2fr
+    ) auto;
+  gap: 6px;
+  align-items: start;
+}
+
+.multipart-key-input,
+.multipart-value-input,
+.multipart-filename-input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.multipart-kind-select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.multipart-file-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.binary-body-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.binary-body-label {
+  flex: 0 0 6.5rem;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.binary-body-row .env-entry-value-with-browse {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.binary-body-row .env-entry-value-input {
+  flex: 1 1 240px;
+  max-width: 100%;
+}
+
 .env-entry-secret-val {
   display: flex;
   align-items: center;

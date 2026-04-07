@@ -2,7 +2,15 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { createDefaultState } from "./defaultState";
 import { migrateAppState } from "./lib/migrateAppState";
 import { payloadContainsSecretPlaceholder } from "./lib/secretPlaceholders";
-import type { AppState, AuthConfig, HttpResponsePayload, KeyValue } from "./types";
+import type {
+  AppState,
+  AuthConfig,
+  BinaryBody,
+  HttpResponsePayload,
+  KeyValue,
+  MultipartPart,
+} from "./types";
+import { stripEphemeralWorkspaceFields } from "./lib/workspacePersist";
 
 const LS_KEY = "echo.workspace.v1";
 
@@ -15,6 +23,8 @@ export type SendRequestPayload = {
   bodyType: string;
   auth: AuthConfig;
   variables: Record<string, string>;
+  multipartParts?: MultipartPart[];
+  binaryBody?: BinaryBody;
 };
 
 function substituteUrl(s: string, vars: Record<string, string>): string {
@@ -69,8 +79,51 @@ async function sendHttpRequestBrowser(
     else url.searchParams.append(k, v);
   }
 
-  let body: string | undefined;
-  if (payload.bodyType === "json" && payload.body) {
+  let body: string | Blob | FormData | ArrayBuffer | undefined;
+
+  if (payload.bodyType === "multipart" && payload.multipartParts?.length) {
+    const fd = new FormData();
+    for (const p of payload.multipartParts) {
+      if (!p.enabled || !p.key.trim()) continue;
+      if (p.partKind === "text") {
+        fd.append(p.key, substituteUrl(p.text ?? "", payload.variables));
+      } else {
+        const b64 = p.fileDataBase64;
+        if (!b64) {
+          throw new Error(
+            "Multipart file parts need a chosen file (use Browse) in the web build."
+          );
+        }
+        const raw = atob(b64);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        const name =
+          substituteUrl(p.fileName ?? "file", payload.variables) || "file";
+        fd.append(p.key, new Blob([bytes]), name);
+      }
+    }
+    body = fd;
+  } else if (payload.bodyType === "binary" && payload.binaryBody) {
+    const bb = payload.binaryBody;
+    const ct =
+      (bb.contentType && substituteUrl(bb.contentType, payload.variables)) ||
+      "application/octet-stream";
+    headers.set("Content-Type", ct);
+    if (bb.browserBase64) {
+      const raw = atob(bb.browserBase64);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      body = bytes.buffer;
+    } else if (bb.path) {
+      throw new Error(
+        "Binary body from a file path is only available in the desktop app. Use Browse to pick a file in the web build."
+      );
+    } else {
+      throw new Error(
+        "Binary body: choose a file (Browse) or set path and Content-Type."
+      );
+    }
+  } else if (payload.bodyType === "json" && payload.body) {
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json; charset=utf-8");
     }
@@ -130,14 +183,15 @@ export async function loadState(): Promise<AppState> {
 }
 
 export async function saveState(state: AppState): Promise<void> {
+  const toSave = stripEphemeralWorkspaceFields(state);
   if (!isTauri()) {
-    saveLocal(state);
+    saveLocal(toSave);
     return;
   }
   try {
-    await invoke("save_state", { state });
+    await invoke("save_state", { state: toSave });
   } catch {
-    saveLocal(state);
+    saveLocal(toSave);
   }
 }
 

@@ -97,6 +97,19 @@ const METHODS = [
 
 const SCRIPT_CHAIN_MAX = 8;
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = r.result as string;
+      const i = s.indexOf(",");
+      resolve(i >= 0 ? s.slice(i + 1) : s);
+    };
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
 const SIDEBAR_WIDTH_STORAGE_KEY = "echo.sidebarWidthPx";
 const DEFAULT_SIDEBAR_WIDTH_PX = 280;
 const MIN_SIDEBAR_WIDTH_PX = 200;
@@ -165,6 +178,9 @@ export default function App() {
   const lastResponsesRef = useRef<Record<string, HttpResponsePayload>>({});
   const pendingEnvFileRowIndex = useRef<number | null>(null);
   const envFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingMultipartRowIndex = useRef<number | null>(null);
+  const multipartFileInputRef = useRef<HTMLInputElement | null>(null);
+  const binaryFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const scheduler = startUpdateCheckScheduler((u) => {
@@ -571,6 +587,107 @@ export default function App() {
       });
     },
     [state?.activeRequestId]
+  );
+
+  const pickMultipartFilePath = useCallback(
+    (rowIndex: number) => {
+      if (!activeRequest) return;
+      if (isTauri()) {
+        void (async () => {
+          const selected = await open({ multiple: false, directory: false });
+          if (selected === null) return;
+          const path = Array.isArray(selected) ? selected[0]! : selected;
+          updateActiveRequest((r) => {
+            const parts = [...(r.multipartParts ?? [])];
+            const cur = parts[rowIndex];
+            if (!cur || cur.partKind !== "file") return r;
+            const base = path.split(/[/\\]/).pop() ?? "";
+            parts[rowIndex] = {
+              ...cur,
+              filePath: path,
+              fileName: cur.fileName?.trim() ? cur.fileName : base,
+              fileDataBase64: undefined,
+            };
+            return { ...r, multipartParts: parts };
+          });
+        })();
+      } else {
+        pendingMultipartRowIndex.current = rowIndex;
+        multipartFileInputRef.current?.click();
+      }
+    },
+    [activeRequest, updateActiveRequest]
+  );
+
+  const onBrowserMultipartFileChosen = useCallback(
+    async (e: ReactChangeEvent<HTMLInputElement>) => {
+      const ix = pendingMultipartRowIndex.current;
+      pendingMultipartRowIndex.current = null;
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f || ix === null || !activeRequest) return;
+      try {
+        const b64 = await fileToBase64(f);
+        updateActiveRequest((r) => {
+          const parts = [...(r.multipartParts ?? [])];
+          const cur = parts[ix];
+          if (!cur || cur.partKind !== "file") return r;
+          parts[ix] = {
+            ...cur,
+            filePath: f.name,
+            fileName: cur.fileName?.trim() ? cur.fileName : f.name,
+            fileDataBase64: b64,
+          };
+          return { ...r, multipartParts: parts };
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [activeRequest, updateActiveRequest]
+  );
+
+  const pickBinaryBodyPath = useCallback(() => {
+    if (!activeRequest) return;
+    if (isTauri()) {
+      void (async () => {
+        const selected = await open({ multiple: false, directory: false });
+        if (selected === null) return;
+        const path = Array.isArray(selected) ? selected[0]! : selected;
+        updateActiveRequest((r) => ({
+          ...r,
+          binaryBody: {
+            path,
+            contentType: r.binaryBody?.contentType ?? "",
+            browserBase64: undefined,
+          },
+        }));
+      })();
+    } else {
+      binaryFileInputRef.current?.click();
+    }
+  }, [activeRequest, updateActiveRequest]);
+
+  const onBrowserBinaryFileChosen = useCallback(
+    async (e: ReactChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f || !activeRequest) return;
+      try {
+        const b64 = await fileToBase64(f);
+        updateActiveRequest((r) => ({
+          ...r,
+          binaryBody: {
+            path: f.name,
+            contentType: r.binaryBody?.contentType ?? "",
+            browserBase64: b64,
+          },
+        }));
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [activeRequest, updateActiveRequest]
   );
 
   const onSend = useCallback(async () => {
@@ -1260,6 +1377,22 @@ export default function App() {
                   tabIndex={-1}
                   onChange={onBrowserEnvFileChosen}
                 />
+                <input
+                  ref={multipartFileInputRef}
+                  type="file"
+                  className="sr-only"
+                  aria-hidden
+                  tabIndex={-1}
+                  onChange={onBrowserMultipartFileChosen}
+                />
+                <input
+                  ref={binaryFileInputRef}
+                  type="file"
+                  className="sr-only"
+                  aria-hidden
+                  tabIndex={-1}
+                  onChange={onBrowserBinaryFileChosen}
+                />
                 <div className="env-entries-grid" style={{ marginTop: 8 }}>
                   {(activeEnv?.variables ?? []).map((row, i) => {
                     const kind = getEntryKind(row);
@@ -1494,20 +1627,53 @@ export default function App() {
               <div className="section">
                 <h3>Body</h3>
                 <select
+                  data-testid="body-type-select"
                   value={activeRequest.bodyType}
-                  onChange={(e) =>
-                    updateActiveRequest((r) => ({
-                      ...r,
-                      bodyType: e.target.value as RequestItem["bodyType"],
-                    }))
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value as RequestItem["bodyType"];
+                    updateActiveRequest((r) => {
+                      if (v === "multipart") {
+                        const parts =
+                          r.multipartParts?.length && r.multipartParts.length > 0
+                            ? r.multipartParts
+                            : [
+                                {
+                                  enabled: true,
+                                  key: "",
+                                  partKind: "text" as const,
+                                  text: "",
+                                },
+                              ];
+                        return {
+                          ...r,
+                          bodyType: v,
+                          body: "",
+                          multipartParts: parts,
+                        };
+                      }
+                      if (v === "binary") {
+                        return {
+                          ...r,
+                          bodyType: v,
+                          body: "",
+                          binaryBody:
+                            r.binaryBody ?? { path: "", contentType: "" },
+                        };
+                      }
+                      return { ...r, bodyType: v };
+                    });
+                  }}
                 >
                   <option value="none">None</option>
                   <option value="json">JSON</option>
                   <option value="raw">Raw</option>
                   <option value="form">x-www-form-urlencoded</option>
+                  <option value="multipart">multipart/form-data</option>
+                  <option value="binary">Binary (file)</option>
                 </select>
-                {activeRequest.bodyType !== "none" ? (
+                {activeRequest.bodyType === "json" ||
+                activeRequest.bodyType === "raw" ||
+                activeRequest.bodyType === "form" ? (
                   <textarea
                     className="body-input"
                     data-testid="body-input"
@@ -1516,6 +1682,248 @@ export default function App() {
                       updateActiveRequest((r) => ({ ...r, body: e.target.value }))
                     }
                   />
+                ) : null}
+                {activeRequest.bodyType === "multipart" ? (
+                  <div className="multipart-panel" style={{ marginTop: 8 }}>
+                    <p className="response-meta" style={{ marginTop: 0 }}>
+                      Form fields and files. Desktop reads file paths from disk;
+                      the web build keeps picked files in memory for this session
+                      only (not in saved workspace JSON).
+                    </p>
+                    <div className="multipart-parts-grid">
+                      {(activeRequest.multipartParts ?? []).map((row, i) => (
+                        <div
+                          className="multipart-part-row"
+                          key={`mp-${activeRequest.id}-${i}`}
+                        >
+                          <input
+                            type="checkbox"
+                            title="Enabled"
+                            checked={row.enabled}
+                            onChange={(e) =>
+                              updateActiveRequest((r) => {
+                                const parts = [...(r.multipartParts ?? [])];
+                                parts[i] = {
+                                  ...row,
+                                  enabled: e.target.checked,
+                                };
+                                return { ...r, multipartParts: parts };
+                              })
+                            }
+                          />
+                          <input
+                            className="multipart-key-input"
+                            placeholder="field name"
+                            data-testid={`multipart-key-${i}`}
+                            value={row.key}
+                            onChange={(e) =>
+                              updateActiveRequest((r) => {
+                                const parts = [...(r.multipartParts ?? [])];
+                                parts[i] = { ...row, key: e.target.value };
+                                return { ...r, multipartParts: parts };
+                              })
+                            }
+                          />
+                          <select
+                            className="multipart-kind-select"
+                            aria-label="Part kind"
+                            data-testid={`multipart-kind-${i}`}
+                            value={row.partKind}
+                            onChange={(e) => {
+                              const kind = e.target.value as "text" | "file";
+                              updateActiveRequest((r) => {
+                                const parts = [...(r.multipartParts ?? [])];
+                                const cur = parts[i]!;
+                                parts[i] =
+                                  kind === "text"
+                                    ? {
+                                        enabled: cur.enabled,
+                                        key: cur.key,
+                                        partKind: "text",
+                                        text: "",
+                                      }
+                                    : {
+                                        enabled: cur.enabled,
+                                        key: cur.key,
+                                        partKind: "file",
+                                      };
+                                return { ...r, multipartParts: parts };
+                              });
+                            }}
+                          >
+                            <option value="text">Text</option>
+                            <option value="file">File</option>
+                          </select>
+                          {row.partKind === "text" ? (
+                            <input
+                              className="multipart-value-input"
+                              placeholder="value"
+                              data-testid={`multipart-text-${i}`}
+                              value={row.text ?? ""}
+                              onChange={(e) =>
+                                updateActiveRequest((r) => {
+                                  const parts = [...(r.multipartParts ?? [])];
+                                  parts[i] = {
+                                    ...row,
+                                    text: e.target.value,
+                                  };
+                                  return { ...r, multipartParts: parts };
+                                })
+                              }
+                            />
+                          ) : (
+                            <div className="multipart-file-cell">
+                              <div className="env-entry-value-with-browse">
+                                <input
+                                  className="env-entry-value-input"
+                                  placeholder="path or Browse"
+                                  data-testid={`multipart-file-path-${i}`}
+                                  title={row.filePath ?? ""}
+                                  value={row.filePath ?? ""}
+                                  onChange={(e) =>
+                                    updateActiveRequest((r) => {
+                                      const parts = [...(r.multipartParts ?? [])];
+                                      parts[i] = {
+                                        ...row,
+                                        filePath: e.target.value,
+                                        ...(isTauri()
+                                          ? {}
+                                          : { fileDataBase64: undefined }),
+                                      };
+                                      return { ...r, multipartParts: parts };
+                                    })
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="env-entry-browse-btn"
+                                  title="Choose file"
+                                  data-testid={`multipart-browse-${i}`}
+                                  onClick={() => pickMultipartFilePath(i)}
+                                >
+                                  …
+                                </button>
+                              </div>
+                              <input
+                                className="multipart-filename-input"
+                                placeholder="filename (optional)"
+                                data-testid={`multipart-filename-${i}`}
+                                value={row.fileName ?? ""}
+                                onChange={(e) =>
+                                  updateActiveRequest((r) => {
+                                    const parts = [...(r.multipartParts ?? [])];
+                                    parts[i] = {
+                                      ...row,
+                                      fileName: e.target.value,
+                                    };
+                                    return { ...r, multipartParts: parts };
+                                  })
+                                }
+                              />
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="env-entry-remove-btn"
+                            title="Remove field"
+                            data-testid={`multipart-remove-${i}`}
+                            onClick={() =>
+                              updateActiveRequest((r) => {
+                                const parts = [...(r.multipartParts ?? [])];
+                                parts.splice(i, 1);
+                                return { ...r, multipartParts: parts };
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="env-toolbar-btn"
+                      data-testid="multipart-add-field"
+                      onClick={() =>
+                        updateActiveRequest((r) => ({
+                          ...r,
+                          multipartParts: [
+                            ...(r.multipartParts ?? []),
+                            {
+                              enabled: true,
+                              key: "",
+                              partKind: "text",
+                              text: "",
+                            },
+                          ],
+                        }))
+                      }
+                    >
+                      + Field
+                    </button>
+                  </div>
+                ) : null}
+                {activeRequest.bodyType === "binary" ? (
+                  <div className="binary-body-panel" style={{ marginTop: 8 }}>
+                    <p className="response-meta" style={{ marginTop: 0 }}>
+                      Raw body from a single file. Desktop reads{" "}
+                      <code>path</code> from disk; web uses Browse (session-only).
+                    </p>
+                    <div className="binary-body-row">
+                      <span className="binary-body-label">Path</span>
+                      <div className="env-entry-value-with-browse">
+                        <input
+                          className="env-entry-value-input"
+                          data-testid="binary-body-path"
+                          placeholder={
+                            isTauri() ? "Path or Browse" : "Browse to pick file"
+                          }
+                          value={activeRequest.binaryBody?.path ?? ""}
+                          onChange={(e) => {
+                            const path = e.target.value;
+                            updateActiveRequest((r) => ({
+                              ...r,
+                              binaryBody: {
+                                path,
+                                contentType: r.binaryBody?.contentType ?? "",
+                                ...(isTauri()
+                                  ? {}
+                                  : { browserBase64: undefined }),
+                              },
+                            }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="env-entry-browse-btn"
+                          title="Choose file"
+                          data-testid="binary-body-browse"
+                          onClick={() => pickBinaryBodyPath()}
+                        >
+                          …
+                        </button>
+                      </div>
+                    </div>
+                    <div className="binary-body-row">
+                      <span className="binary-body-label">Content-Type</span>
+                      <input
+                        className="env-entry-value-input"
+                        data-testid="binary-body-content-type"
+                        placeholder="application/octet-stream"
+                        value={activeRequest.binaryBody?.contentType ?? ""}
+                        onChange={(e) =>
+                          updateActiveRequest((r) => ({
+                            ...r,
+                            binaryBody: {
+                              path: r.binaryBody?.path ?? "",
+                              contentType: e.target.value,
+                              browserBase64: r.binaryBody?.browserBase64,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
                 ) : null}
               </div>
 

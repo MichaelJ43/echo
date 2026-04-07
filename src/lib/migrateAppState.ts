@@ -50,6 +50,15 @@ export function migrateAppState(state: unknown): AppState {
     return { ...r, environmentId: defaultEnvId };
   });
 
+  collections = mapEveryRequest(collections, (r) => {
+    const multipartParts = r.multipartParts ?? [];
+    const next: RequestItem = { ...r, multipartParts };
+    if (r.bodyType === "binary" && !r.binaryBody) {
+      next.binaryBody = { path: "", contentType: "" };
+    }
+    return next;
+  });
+
   const activeRequestId =
     typeof s.activeRequestId === "string" ? s.activeRequestId : null;
 

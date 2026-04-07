@@ -15,6 +15,27 @@ export type AuthConfig =
   | { type: "basic"; username: string; password: string }
   | { type: "apiKey"; key: string; value: string; addTo: "header" | "query" };
 
+/** Part of a `multipart/form-data` body (desktop: read `filePath` from disk; web: `fileDataBase64`). */
+export type MultipartPart = {
+  enabled: boolean;
+  key: string;
+  partKind: "text" | "file";
+  text?: string;
+  filePath?: string;
+  fileName?: string;
+  /** Browser-only; stripped before save. */
+  fileDataBase64?: string;
+};
+
+/** Raw request body from a single file (`bodyType` `binary`). */
+export type BinaryBody = {
+  path: string;
+  /** Empty = `application/octet-stream`. */
+  contentType: string;
+  /** Browser-only; stripped before save. */
+  browserBase64?: string;
+};
+
 export type RequestItem = {
   id: string;
   name: string;
@@ -25,7 +46,11 @@ export type RequestItem = {
   headers: KeyValue[];
   queryParams: KeyValue[];
   body: string;
-  bodyType: "none" | "json" | "raw" | "form";
+  bodyType: "none" | "json" | "raw" | "form" | "multipart" | "binary";
+  /** Used when `bodyType` is `multipart`. */
+  multipartParts?: MultipartPart[];
+  /** Used when `bodyType` is `binary`. */
+  binaryBody?: BinaryBody;
   auth: AuthConfig;
   script: string;
 };

@@ -4,6 +4,7 @@ import type {
   Environment,
   HttpResponsePayload,
   KeyValue,
+  MultipartPart,
   RequestItem,
 } from "../types";
 import { expandRequestReferences } from "./requestRef";
@@ -58,6 +59,20 @@ function expandAuth(
   }
 }
 
+function expandMultipartParts(
+  parts: MultipartPart[],
+  exp: (s: string) => string
+): MultipartPart[] {
+  return parts.map((p) => ({
+    ...p,
+    key: exp(p.key),
+    text: p.text !== undefined ? exp(p.text) : undefined,
+    filePath: p.filePath !== undefined ? exp(p.filePath) : undefined,
+    fileName: p.fileName !== undefined ? exp(p.fileName) : undefined,
+    fileDataBase64: p.fileDataBase64,
+  }));
+}
+
 /**
  * Build payload for `send_http_request` with request-reference + env substitution
  * applied to URL, headers, query, body, and auth fields.
@@ -77,6 +92,11 @@ export function buildExpandedSendPayload(
     return out.text;
   };
 
+  const bodyForPayload =
+    req.bodyType === "multipart" || req.bodyType === "binary"
+      ? ""
+      : exp(req.body);
+
   const payload: SendRequestPayload = {
     method: req.method,
     url: exp(req.url),
@@ -90,11 +110,24 @@ export function buildExpandedSendPayload(
       key: exp(q.key),
       value: exp(q.value),
     })),
-    body: exp(req.body),
+    body: bodyForPayload,
     bodyType: req.bodyType,
     auth: expandAuth(req.auth, exp),
     variables: variablesToMap(variables),
   };
+
+  if (req.bodyType === "multipart" && req.multipartParts?.length) {
+    payload.multipartParts = expandMultipartParts(req.multipartParts, exp);
+  }
+  if (req.bodyType === "binary" && req.binaryBody) {
+    payload.binaryBody = {
+      path: exp(req.binaryBody.path),
+      contentType: req.binaryBody.contentType
+        ? exp(req.binaryBody.contentType)
+        : "",
+      browserBase64: req.binaryBody.browserBase64,
+    };
+  }
 
   return { payload, errors: [...new Set(allErrors)] };
 }
