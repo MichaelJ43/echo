@@ -106,6 +106,36 @@
             },
             {
               "nodeType": "request",
+              "id": "r0000001-0000-4000-8000-000000000008",
+              "name": "POST — multipart (file + text)",
+              "environmentId": "e0000001-0000-4000-8000-000000000001",
+              "method": "POST",
+              "url": "{{httpbin}}/post",
+              "headers": [],
+              "queryParams": [],
+              "body": "",
+              "bodyType": "multipart",
+              "multipartParts": [
+                {
+                  "enabled": true,
+                  "key": "note",
+                  "partKind": "text",
+                  "text": "Echo demo (text field)"
+                },
+                {
+                  "enabled": true,
+                  "key": "file",
+                  "partKind": "file",
+                  "filePath": "examples/demo-upload.txt",
+                  "fileName": "demo-upload.txt",
+                  "fileDataBase64": "RWNobyBkZW1vIG11bHRpcGFydCB1cGxvYWQuCg=="
+                }
+              ],
+              "auth": { "type": "none" },
+              "script": ""
+            },
+            {
+              "nodeType": "request",
               "id": "r0000001-0000-4000-8000-000000000004",
               "name": "GET — custom headers",
               "environmentId": "e0000001-0000-4000-8000-000000000001",

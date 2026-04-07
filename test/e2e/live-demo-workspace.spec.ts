@@ -12,6 +12,7 @@ const R = {
   postJson: "r0000001-0000-4000-8000-000000000002",
   postRaw: "r0000001-0000-4000-8000-000000000007",
   postForm: "r0000001-0000-4000-8000-000000000003",
+  postMultipart: "r0000001-0000-4000-8000-000000000008",
   getHeaders: "r0000001-0000-4000-8000-000000000004",
   head: "r0000001-0000-4000-8000-000000000005",
   options: "r0000001-0000-4000-8000-000000000006",
@@ -78,7 +79,7 @@ test.describe("Live demo workspace (examples/echo-feature-demo.workspace.json)",
     retries: process.env.CI ? 1 : 0,
   });
 
-  test("Basics — GET query, POST JSON/raw/form, custom headers, HEAD, OPTIONS", async ({
+  test("Basics — GET query, POST JSON/raw/form/multipart, custom headers, HEAD, OPTIONS", async ({
     page,
   }) => {
     await gotoLoaded(page);
@@ -101,6 +102,12 @@ test.describe("Live demo workspace (examples/echo-feature-demo.workspace.json)",
     await selectRequest(page, R.postForm);
     await sendExpectStatus(page, /200/);
     await expect(page.getByTestId("response-body")).toContainText("form", {
+      timeout: 5_000,
+    });
+
+    await selectRequest(page, R.postMultipart);
+    await sendExpectStatus(page, /200/);
+    await expect(page.getByTestId("response-body")).toContainText("Echo demo multipart", {
       timeout: 5_000,
     });
 
