@@ -23,6 +23,8 @@ export type SendRequestPayload = {
   bodyType: string;
   auth: AuthConfig;
   variables: Record<string, string>;
+  /** Active environment id (UUID) for `{{secret:name}}` resolution on desktop. */
+  environmentId: string;
   multipartParts?: MultipartPart[];
   binaryBody?: BinaryBody;
 };
@@ -211,6 +213,15 @@ export async function sendHttpRequest(
 
 export async function listSecretKeys(): Promise<string[]> {
   return invoke<string[]>("list_secret_keys");
+}
+
+/** Logical secret names for this environment (composed keys `echo_<envId>_…`).
+ * Desktop only; returns [] in the browser build. */
+export async function listSecretLogicalNamesForEnvironment(
+  environmentId: string
+): Promise<string[]> {
+  if (!isTauri()) return [];
+  return invoke<string[]>("list_secret_logical_names_for_env", { environmentId });
 }
 
 export async function setSecret(key: string, value: string): Promise<void> {

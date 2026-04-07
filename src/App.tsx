@@ -14,13 +14,16 @@ import type { Update } from "@tauri-apps/plugin-updater";
 import { isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
+  deleteSecret,
   exportWorkspaceFile,
   getPaths,
   importWorkspaceFile,
+  listSecretLogicalNamesForEnvironment,
   loadState,
   openContainingFolder,
   saveState,
   sendHttpRequest,
+  setSecret,
 } from "./api";
 import {
   addChildToFolder,
@@ -65,11 +68,11 @@ import type {
   KeyValue,
   RequestItem,
 } from "./types";
+import { composeSecretStorageKey } from "./lib/secretStorageKey";
 import { getEntryKind } from "./lib/variables";
 import { AboutDialog } from "./components/AboutDialog";
 import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfirmDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
-import { SecretsDialog } from "./components/SecretsDialog";
 import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
 import {
   TreeNodes,
@@ -96,6 +99,9 @@ const METHODS = [
 ];
 
 const SCRIPT_CHAIN_MAX = 8;
+
+/** Fixed-width mask for stored secret values (does not reflect length). */
+const SECRET_VALUE_MASK = "********";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -155,7 +161,6 @@ export default function App() {
   const [treeContextMenu, setTreeContextMenu] = useState<TreeMenuState | null>(
     null
   );
-  const [secretsOpen, setSecretsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [importReplaceDialogOpen, setImportReplaceDialogOpen] = useState(false);
   const [lastResponses, setLastResponses] = useState<
@@ -181,6 +186,15 @@ export default function App() {
   const pendingMultipartRowIndex = useRef<number | null>(null);
   const multipartFileInputRef = useRef<HTMLInputElement | null>(null);
   const binaryFileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Logical names with a composed keychain entry for the active environment (desktop). */
+  const [storedSecretLogicalNames, setStoredSecretLogicalNames] = useState<
+    string[]
+  >([]);
+  const [secretEditRowIndex, setSecretEditRowIndex] = useState<number | null>(
+    null
+  );
+  const [secretValueDraft, setSecretValueDraft] = useState("");
+  const envEntryNameFocusKeyRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
     const scheduler = startUpdateCheckScheduler((u) => {
@@ -373,6 +387,24 @@ export default function App() {
       state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null
     );
   }, [state, activeRequest]);
+
+  useEffect(() => {
+    if (!activeEnv || !isTauri()) {
+      setStoredSecretLogicalNames([]);
+      return;
+    }
+    let cancelled = false;
+    void listSecretLogicalNamesForEnvironment(activeEnv.id)
+      .then((names) => {
+        if (!cancelled) setStoredSecretLogicalNames(names);
+      })
+      .catch(() => {
+        if (!cancelled) setStoredSecretLogicalNames([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeEnv?.id]);
 
   const pickEnvironmentFilePath = useCallback(
     (rowIndex: number) => {
@@ -587,6 +619,61 @@ export default function App() {
       });
     },
     [state?.activeRequestId]
+  );
+
+  const commitSecretValueAtRow = useCallback(
+    async (
+      logicalKey: string,
+      valueTrimmed: string,
+      wasStored: boolean
+    ) => {
+      if (!activeEnv || !isTauri()) return;
+      const key = logicalKey.trim();
+      if (!key) {
+        setInfoToast("Enter a secret name first.");
+        setSecretEditRowIndex(null);
+        setSecretValueDraft("");
+        return;
+      }
+      const composed = composeSecretStorageKey(activeEnv.id, key);
+      try {
+        if (!valueTrimmed) {
+          if (wasStored) {
+            await deleteSecret(composed);
+            await deleteSecret(key).catch(() => {});
+            setStoredSecretLogicalNames((prev) => prev.filter((x) => x !== key));
+          }
+        } else {
+          await setSecret(composed, valueTrimmed);
+          setStoredSecretLogicalNames((prev) =>
+            prev.includes(key) ? prev : [...prev, key]
+          );
+        }
+      } catch (e) {
+        setInfoToast(e instanceof Error ? e.message : String(e));
+      } finally {
+        setSecretEditRowIndex(null);
+        setSecretValueDraft("");
+      }
+    },
+    [activeEnv]
+  );
+
+  const onSecretEntryNameBlur = useCallback(
+    (rowIndex: number, row: KeyValue, currentKey: string) => {
+      const before = envEntryNameFocusKeyRef.current[rowIndex] ?? "";
+      if (getEntryKind(row) !== "secret") return;
+      if (before && before !== currentKey && activeEnv) {
+        void (async () => {
+          await deleteSecret(
+            composeSecretStorageKey(activeEnv.id, before)
+          ).catch(() => {});
+          await deleteSecret(before).catch(() => {});
+          setStoredSecretLogicalNames((prev) => prev.filter((x) => x !== before));
+        })();
+      }
+    },
+    [activeEnv]
   );
 
   const pickMultipartFilePath = useCallback(
@@ -1399,7 +1486,7 @@ export default function App() {
                     return (
                       <div
                         className="env-entry-row"
-                        key={`${activeEnv?.id ?? "env"}-${i}-${row.key}`}
+                        key={`${activeEnv?.id ?? "env"}-${i}`}
                       >
                         <input
                           type="checkbox"
@@ -1462,6 +1549,12 @@ export default function App() {
                           placeholder="name"
                           data-testid={`env-entry-name-${i}`}
                           value={row.key}
+                          onFocus={() => {
+                            envEntryNameFocusKeyRef.current[i] = row.key;
+                          }}
+                          onBlur={(e) => {
+                            onSecretEntryNameBlur(i, row, e.currentTarget.value);
+                          }}
                           onChange={(e) => {
                             const vars = [...(activeEnv?.variables ?? [])];
                             vars[i] = { ...row, key: e.target.value };
@@ -1479,15 +1572,79 @@ export default function App() {
                           }}
                         />
                         {kind === "secret" ? (
-                          <div
-                            className="env-entry-secret-val"
-                            title="Secret values will be stored in the OS keychain; wiring comes in a follow-up."
-                          >
-                            <span className="env-entry-secret-mask" aria-hidden>
-                              ••••••••
-                            </span>
-                            <span className="env-entry-secret-hint">Keychain</span>
-                          </div>
+                          !isTauri() ? (
+                            <span className="response-meta">{`Desktop only — use {{secret:${row.key || "name"}}} in requests`}</span>
+                          ) : secretEditRowIndex === i ? (
+                            <input
+                              className="env-entry-value-input"
+                              data-testid={`env-entry-secret-value-${i}`}
+                              type="password"
+                              autoComplete="off"
+                              autoFocus
+                              placeholder={
+                                storedSecretLogicalNames.includes(row.key)
+                                  ? "New value (replaces stored)"
+                                  : "Value"
+                              }
+                              aria-label="Secret value"
+                              value={secretValueDraft}
+                              onChange={(e) => setSecretValueDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              onBlur={(e) => {
+                                void commitSecretValueAtRow(
+                                  row.key,
+                                  e.currentTarget.value.trim(),
+                                  storedSecretLogicalNames.includes(row.key)
+                                );
+                              }}
+                            />
+                          ) : storedSecretLogicalNames.includes(row.key) ? (
+                            <button
+                              type="button"
+                              className="env-entry-secret-stored-btn"
+                              data-testid={`env-entry-secret-value-${i}`}
+                              aria-label="Secret stored; click to replace"
+                              onClick={() => {
+                                setSecretEditRowIndex(i);
+                                setSecretValueDraft("");
+                              }}
+                            >
+                              <span className="env-entry-secret-mask" aria-hidden>
+                                {SECRET_VALUE_MASK}
+                              </span>
+                              <span className="env-entry-secret-hint">Stored</span>
+                            </button>
+                          ) : (
+                            <input
+                              className="env-entry-value-input"
+                              data-testid={`env-entry-secret-value-${i}`}
+                              type="password"
+                              autoComplete="off"
+                              placeholder="Value"
+                              aria-label="Secret value"
+                              value={secretEditRowIndex === i ? secretValueDraft : ""}
+                              onChange={(e) => {
+                                setSecretEditRowIndex(i);
+                                setSecretValueDraft(e.target.value);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              onBlur={(e) => {
+                                void commitSecretValueAtRow(
+                                  row.key,
+                                  e.currentTarget.value.trim(),
+                                  false
+                                );
+                              }}
+                            />
+                          )
                         ) : kind === "file" ? (
                           <div className="env-entry-value-with-browse">
                             <input
@@ -2070,20 +2227,6 @@ export default function App() {
           >
             View releases
           </button>
-          <button
-            type="button"
-            data-testid="meta-menu-secrets"
-            onClick={() => {
-              setMetaMenu(null);
-              if (!isTauri()) {
-                setInfoToast("Local secrets are only available in the desktop app.");
-                return;
-              }
-              setSecretsOpen(true);
-            }}
-          >
-            Manage local secrets
-          </button>
           <div className="context-menu-sep" role="separator" />
           <button
             type="button"
@@ -2124,7 +2267,6 @@ export default function App() {
         onClose={() => setImportReplaceDialogOpen(false)}
         onConfirmReplace={runImportReplaceWorkspace}
       />
-      <SecretsDialog open={secretsOpen} onClose={() => setSecretsOpen(false)} />
       {htmlPreviewOpen && response ? (
         <HtmlPreviewModal
           html={response.body}

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { migrateAppState } from "./migrateAppState";
 
+const E1 = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
 describe("migrateAppState", () => {
   it("fills environmentId from legacy activeEnvironmentId", () => {
     const next = migrateAppState({
       version: 1,
-      activeEnvironmentId: "e1",
-      environments: [{ id: "e1", name: "Default", variables: [] }],
+      activeEnvironmentId: E1,
+      environments: [{ id: E1, name: "Default", variables: [] }],
       collections: [
         {
           nodeType: "folder",
@@ -37,13 +39,13 @@ describe("migrateAppState", () => {
     const leaf = req.children[0];
     expect(leaf?.nodeType).toBe("request");
     if (leaf?.nodeType !== "request") return;
-    expect(leaf.environmentId).toBe("e1");
+    expect(leaf.environmentId).toBe(E1);
   });
 
   it("reassigns dangling environmentId to first env", () => {
     const next = migrateAppState({
       version: 1,
-      environments: [{ id: "e1", name: "Default", variables: [] }],
+      environments: [{ id: E1, name: "Default", variables: [] }],
       collections: [
         {
           nodeType: "request",
@@ -65,7 +67,7 @@ describe("migrateAppState", () => {
     const r = next.collections[0];
     expect(r?.nodeType).toBe("request");
     if (r?.nodeType !== "request") return;
-    expect(r.environmentId).toBe("e1");
+    expect(r.environmentId).toBe(E1);
   });
 
   it("defaults entryKind to variable for legacy rows", () => {
@@ -73,7 +75,7 @@ describe("migrateAppState", () => {
       version: 1,
       environments: [
         {
-          id: "e1",
+          id: E1,
           name: "Default",
           variables: [{ key: "k", value: "v", enabled: true }],
         },
@@ -82,5 +84,15 @@ describe("migrateAppState", () => {
       activeRequestId: null,
     });
     expect(next.environments[0]?.variables[0]?.entryKind).toBe("variable");
+  });
+
+  it("remaps non-UUID environment ids to UUIDs", () => {
+    const next = migrateAppState({
+      version: 1,
+      environments: [{ id: "short-id", name: "Default", variables: [] }],
+      collections: [],
+      activeRequestId: null,
+    });
+    expect(next.environments[0]?.id.length).toBe(36);
   });
 });

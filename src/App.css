@@ -527,6 +527,27 @@ body,
   font-size: 12px;
 }
 
+.env-entry-secret-stored-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.env-entry-secret-stored-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .env-entry-secret-mask {
   letter-spacing: 0.08em;
   color: var(--muted);

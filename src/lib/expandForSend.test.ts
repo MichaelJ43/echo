@@ -4,9 +4,11 @@ import type { CollectionNode, Environment } from "../types";
 
 const emptyCollections: CollectionNode[] = [];
 
+const TEST_ENV_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
 function envWith(vars: { key: string; value: string }[]): Environment {
   return {
-    id: "e1",
+    id: TEST_ENV_ID,
     name: "Default",
     variables: vars.map((v) => ({
       key: v.key,
@@ -23,7 +25,7 @@ describe("buildExpandedSendPayload", () => {
     const req = {
       id: "r1",
       name: "t",
-      environmentId: "e1",
+      environmentId: TEST_ENV_ID,
       method: "POST",
       url: "https://example.com",
       headers: [],
@@ -51,6 +53,7 @@ describe("buildExpandedSendPayload", () => {
     expect(payload.bodyType).toBe("multipart");
     expect(payload.multipartParts?.[0]?.key).toBe("khello");
     expect(payload.multipartParts?.[0]?.text).toBe("vhello");
+    expect(payload.environmentId).toBe(TEST_ENV_ID);
   });
 
   it("expands binary body path and content type", () => {
@@ -58,7 +61,7 @@ describe("buildExpandedSendPayload", () => {
     const req = {
       id: "r1",
       name: "t",
-      environmentId: "e1",
+      environmentId: TEST_ENV_ID,
       method: "POST",
       url: "https://example.com",
       headers: [],
@@ -87,7 +90,7 @@ describe("buildExpandedSendPayload", () => {
     const req = {
       id: "r1",
       name: "t",
-      environmentId: "e1",
+      environmentId: TEST_ENV_ID,
       method: "POST",
       url: "https://example.com",
       headers: [],
