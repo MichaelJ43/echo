@@ -232,6 +232,14 @@ export async function deleteSecret(key: string): Promise<void> {
   await invoke("delete_secret", { key });
 }
 
+/** Remove all composed keychain secrets for an environment (`echo_<id>_…`). Desktop only. */
+export async function deleteSecretsForEnvironment(
+  environmentId: string
+): Promise<number> {
+  if (!isTauri()) return 0;
+  return invoke<number>("delete_secrets_for_environment", { environmentId });
+}
+
 export async function importWorkspaceFile(path: string): Promise<AppState> {
   return migrateAppState(await invoke<AppState>("import_workspace_file", { path }));
 }

@@ -99,6 +99,14 @@ fn delete_secret(app: tauri::AppHandle, key: String) -> Result<(), String> {
     secrets::delete_secret(&app, key)
 }
 
+#[tauri::command]
+fn delete_secrets_for_environment(
+    app: tauri::AppHandle,
+    environment_id: String,
+) -> Result<usize, String> {
+    secrets::delete_secrets_for_environment(&app, &environment_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -119,7 +127,8 @@ pub fn run() {
             list_secret_keys,
             list_secret_logical_names_for_env,
             set_secret,
-            delete_secret
+            delete_secret,
+            delete_secrets_for_environment
         ])
         .setup(|app| {
             let handle = app.handle().clone();

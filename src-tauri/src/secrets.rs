@@ -178,6 +178,28 @@ pub fn list_secret_logical_names_for_env(
     Ok(out)
 }
 
+/// Removes every keychain entry whose storage key starts with `echo_<environmentId>_`.
+/// Call when an environment is deleted so secrets do not remain as orphans in the OS store.
+pub fn delete_secrets_for_environment(
+    app: &AppHandle,
+    environment_id: &str,
+) -> Result<usize, String> {
+    if environment_id.len() != ENVIRONMENT_ID_LEN || !is_uuid_simple(environment_id) {
+        return Err("Invalid environment id.".into());
+    }
+    let prefix = format!("echo_{environment_id}_");
+    let all = load_secret_index(app)?;
+    let to_remove: Vec<String> = all
+        .into_iter()
+        .filter(|k| k.starts_with(&prefix))
+        .collect();
+    let n = to_remove.len();
+    for key in to_remove {
+        delete_secret(app, key)?;
+    }
+    Ok(n)
+}
+
 #[cfg(test)]
 mod tests {
     use super::validate_secret_key;

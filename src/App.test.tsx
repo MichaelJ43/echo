@@ -49,6 +49,7 @@ vi.mock("./api", () => ({
   exportWorkspaceFile: vi.fn(),
   listSecretLogicalNamesForEnvironment: vi.fn(async () => []),
   deleteSecret: vi.fn(),
+  deleteSecretsForEnvironment: vi.fn(),
   setSecret: vi.fn(),
 }));
 
