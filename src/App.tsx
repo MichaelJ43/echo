@@ -15,6 +15,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   deleteSecret,
+  deleteSecretsForEnvironment,
   exportWorkspaceFile,
   getPaths,
   importWorkspaceFile,
@@ -1174,6 +1175,16 @@ export default function App() {
     const removedId = activeEnv.id;
     const replacement = state.environments.find((e) => e.id !== removedId)?.id;
     if (!replacement) return;
+    if (isTauri()) {
+      void deleteSecretsForEnvironment(removedId).catch((e) => {
+        console.error(e);
+        setInfoToast(
+          `Could not remove all keychain secrets for the deleted environment: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
+      });
+    }
     setState((s) => {
       if (!s) return s;
       return {
