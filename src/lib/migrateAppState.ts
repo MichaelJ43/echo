@@ -1,5 +1,18 @@
-import type { AppState, CollectionNode, Environment, RequestItem } from "../types";
+import type {
+  AppState,
+  CollectionNode,
+  Environment,
+  KeyValue,
+  RequestItem,
+} from "../types";
 import { mapEveryRequest } from "./collection";
+
+function normalizeVariables(vars: KeyValue[]): KeyValue[] {
+  return vars.map((v) => ({
+    ...v,
+    entryKind: v.entryKind ?? "variable",
+  }));
+}
 
 /**
  * Normalize workspace JSON from disk or older versions: per-request `environmentId`,
@@ -13,6 +26,10 @@ export function migrateAppState(state: unknown): AppState {
     const id = crypto.randomUUID();
     environments = [{ id, name: "Default", variables: [] }];
   }
+  environments = environments.map((env) => ({
+    ...env,
+    variables: normalizeVariables(env.variables ?? []),
+  }));
   const defaultEnvId = environments[0]!.id;
   const legacyActive =
     typeof s.activeEnvironmentId === "string" ? s.activeEnvironmentId : null;

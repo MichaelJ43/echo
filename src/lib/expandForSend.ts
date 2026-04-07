@@ -7,12 +7,12 @@ import type {
   RequestItem,
 } from "../types";
 import { expandRequestReferences } from "./requestRef";
-import { variablesToMap } from "./variables";
+import { isSubstitutionEntry, variablesToMap } from "./variables";
 
 function applyEnvVariables(text: string, variables: KeyValue[]): string {
   let out = text;
   for (const row of variables) {
-    if (!row.enabled || !row.key) continue;
+    if (!row.enabled || !row.key || !isSubstitutionEntry(row)) continue;
     const needle = `{{${row.key}}}`;
     out = out.split(needle).join(row.value);
   }

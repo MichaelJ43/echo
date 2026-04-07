@@ -28,4 +28,12 @@ describe("variablesToMap", () => {
     ];
     expect(variablesToMap(vars)).toEqual({ a: "1" });
   });
+
+  it("excludes secret rows from {{key}} substitution map", () => {
+    const vars: KeyValue[] = [
+      { key: "x", value: "secret-val", enabled: true, entryKind: "secret" },
+      { key: "y", value: "ok", enabled: true, entryKind: "variable" },
+    ];
+    expect(variablesToMap(vars)).toEqual({ y: "ok" });
+  });
 });
