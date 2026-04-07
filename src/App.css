@@ -548,6 +548,12 @@ body,
   background: rgba(255, 255, 255, 0.06);
 }
 
+.env-entry-secret-stored-btn--saved {
+  border-style: solid;
+  border-color: rgba(63, 185, 80, 0.55);
+  background: rgba(63, 185, 80, 0.1);
+}
+
 .env-entry-secret-mask {
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -556,6 +562,11 @@ body,
 .env-entry-secret-hint {
   color: var(--muted);
   font-size: 11px;
+}
+
+.env-entry-secret-hint--saved {
+  color: var(--success);
+  font-weight: 600;
 }
 
 .sr-only {

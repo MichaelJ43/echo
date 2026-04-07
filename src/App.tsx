@@ -195,6 +195,12 @@ export default function App() {
     null
   );
   const [secretValueDraft, setSecretValueDraft] = useState("");
+  /** Row index that just had a secret saved (brief success cue). */
+  const [secretJustSavedRowIndex, setSecretJustSavedRowIndex] = useState<
+    number | null
+  >(null);
+  /** Bumps on each successful save so the hide timer resets for repeat saves on the same row. */
+  const [secretSaveStamp, setSecretSaveStamp] = useState(0);
   const envEntryNameFocusKeyRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
@@ -388,6 +394,16 @@ export default function App() {
       state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null
     );
   }, [state, activeRequest]);
+
+  useEffect(() => {
+    setSecretJustSavedRowIndex(null);
+  }, [activeEnv?.id]);
+
+  useEffect(() => {
+    if (secretJustSavedRowIndex === null) return;
+    const t = window.setTimeout(() => setSecretJustSavedRowIndex(null), 2800);
+    return () => clearTimeout(t);
+  }, [secretJustSavedRowIndex, secretSaveStamp]);
 
   useEffect(() => {
     if (!activeEnv || !isTauri()) {
@@ -623,7 +639,11 @@ export default function App() {
   );
 
   const commitSecretValueAtRow = useCallback(
-    async (logicalKey: string, valueTrimmed: string) => {
+    async (
+      logicalKey: string,
+      valueTrimmed: string,
+      rowIndex: number
+    ) => {
       if (!activeEnv || !isTauri()) return;
       const key = logicalKey.trim();
       if (!key) {
@@ -642,6 +662,8 @@ export default function App() {
           setStoredSecretLogicalNames((prev) =>
             prev.includes(key) ? prev : [...prev, key]
           );
+          setSecretJustSavedRowIndex(rowIndex);
+          setSecretSaveStamp((s) => s + 1);
         }
       } catch (e) {
         setInfoToast(e instanceof Error ? e.message : String(e));
@@ -1540,6 +1562,9 @@ export default function App() {
                             const prev = vars[i]!;
                             const prevKind = getEntryKind(prev);
                             if (next === prevKind) return;
+                            setSecretJustSavedRowIndex((cur) =>
+                              cur === i ? null : cur
+                            );
                             if (prevKind === "secret") {
                               removeStoredSecretForLogicalKey(prev.key);
                               if (secretEditRowIndex === i) {
@@ -1627,17 +1652,27 @@ export default function App() {
                               onBlur={(e) => {
                                 void commitSecretValueAtRow(
                                   row.key,
-                                  e.currentTarget.value.trim()
+                                  e.currentTarget.value.trim(),
+                                  i
                                 );
                               }}
                             />
                           ) : storedSecretLogicalNames.includes(row.key) ? (
                             <button
                               type="button"
-                              className="env-entry-secret-stored-btn"
+                              className={
+                                secretJustSavedRowIndex === i
+                                  ? "env-entry-secret-stored-btn env-entry-secret-stored-btn--saved"
+                                  : "env-entry-secret-stored-btn"
+                              }
                               data-testid={`env-entry-secret-value-${i}`}
-                              aria-label="Secret stored; click to replace"
+                              aria-label={
+                                secretJustSavedRowIndex === i
+                                  ? "Secret saved; click to replace"
+                                  : "Secret stored; click to replace"
+                              }
                               onClick={() => {
+                                setSecretJustSavedRowIndex(null);
                                 setSecretEditRowIndex(i);
                                 setSecretValueDraft("");
                               }}
@@ -1645,7 +1680,15 @@ export default function App() {
                               <span className="env-entry-secret-mask" aria-hidden>
                                 {SECRET_VALUE_MASK}
                               </span>
-                              <span className="env-entry-secret-hint">Stored</span>
+                              <span
+                                className={
+                                  secretJustSavedRowIndex === i
+                                    ? "env-entry-secret-hint env-entry-secret-hint--saved"
+                                    : "env-entry-secret-hint"
+                                }
+                              >
+                                {secretJustSavedRowIndex === i ? "Saved" : "Stored"}
+                              </span>
                             </button>
                           ) : (
                             <input
@@ -1668,7 +1711,8 @@ export default function App() {
                               onBlur={(e) => {
                                 void commitSecretValueAtRow(
                                   row.key,
-                                  e.currentTarget.value.trim()
+                                  e.currentTarget.value.trim(),
+                                  i
                                 );
                               }}
                             />
