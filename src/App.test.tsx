@@ -48,6 +48,8 @@ vi.mock("./api", () => ({
   importWorkspaceFile: vi.fn(),
   exportWorkspaceFile: vi.fn(),
   listSecretLogicalNamesForEnvironment: vi.fn(async () => []),
+  listSecretKeys: vi.fn(async () => []),
+  resolveSecretPlaceholderRows: vi.fn(async () => []),
   deleteSecret: vi.fn(),
   deleteSecretsForEnvironment: vi.fn(),
   setSecret: vi.fn(),

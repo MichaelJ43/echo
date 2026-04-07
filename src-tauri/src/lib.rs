@@ -107,6 +107,13 @@ fn delete_secrets_for_environment(
     secrets::delete_secrets_for_environment(&app, &environment_id)
 }
 
+#[tauri::command]
+fn resolve_secret_placeholder_rows(
+    rows: Vec<secrets::SecretPlaceholderRowInput>,
+) -> Result<Vec<secrets::SecretPlaceholderResolution>, String> {
+    secrets::resolve_secret_placeholder_rows(rows)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -128,7 +135,8 @@ pub fn run() {
             list_secret_logical_names_for_env,
             set_secret,
             delete_secret,
-            delete_secrets_for_environment
+            delete_secrets_for_environment,
+            resolve_secret_placeholder_rows
         ])
         .setup(|app| {
             let handle = app.handle().clone();

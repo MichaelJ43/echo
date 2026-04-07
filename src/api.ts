@@ -240,6 +240,18 @@ export async function deleteSecretsForEnvironment(
   return invoke<number>("delete_secrets_for_environment", { environmentId });
 }
 
+/** Desktop: whether each `{{secret:NAME}}` row can be read from the credential store (batch). */
+export async function resolveSecretPlaceholderRows(
+  rows: { environmentId: string; logicalName: string }[]
+): Promise<{ environmentId: string; logicalName: string; ok: boolean }[]> {
+  if (!isTauri() || rows.length === 0) {
+    return rows.map((r) => ({ ...r, ok: true }));
+  }
+  return invoke<
+    { environmentId: string; logicalName: string; ok: boolean }[]
+  >("resolve_secret_placeholder_rows", { rows });
+}
+
 export async function importWorkspaceFile(path: string): Promise<AppState> {
   return migrateAppState(await invoke<AppState>("import_workspace_file", { path }));
 }

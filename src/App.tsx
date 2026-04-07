@@ -19,10 +19,12 @@ import {
   exportWorkspaceFile,
   getPaths,
   importWorkspaceFile,
+  listSecretKeys,
   listSecretLogicalNamesForEnvironment,
   loadState,
   openContainingFolder,
   saveState,
+  resolveSecretPlaceholderRows,
   sendHttpRequest,
   setSecret,
 } from "./api";
@@ -69,10 +71,17 @@ import type {
   KeyValue,
   RequestItem,
 } from "./types";
+import {
+  findOrphanComposedKeysInIndex,
+  gatherSecretPlaceholderRows,
+  isLogicalSecretMissing,
+  missingLogicalNamesByEnv,
+} from "./lib/secretSync";
 import { composeSecretStorageKey } from "./lib/secretStorageKey";
 import { getEntryKind } from "./lib/variables";
 import { AboutDialog } from "./components/AboutDialog";
 import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfirmDialog";
+import { OrphanCredentialsDialog } from "./components/OrphanCredentialsDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
 import { TreeInlineNameRow } from "./components/TreeInlineNameRow";
 import {
@@ -201,6 +210,14 @@ export default function App() {
   >(null);
   /** Bumps on each successful save so the hide timer resets for repeat saves on the same row. */
   const [secretSaveStamp, setSecretSaveStamp] = useState(0);
+  /** Desktop: secret logical names not readable from the credential store (by environment id). */
+  const [secretMissingByEnv, setSecretMissingByEnv] = useState<
+    Record<string, string[]>
+  >({});
+  /** Composed keys listed in the index but unused by any Secret row — offer cleanup modal. */
+  const [orphanCredentialKeys, setOrphanCredentialKeys] = useState<
+    string[] | null
+  >(null);
   const envEntryNameFocusKeyRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
@@ -352,6 +369,22 @@ export default function App() {
     };
   }, []);
 
+  const runSecretSyncForState = useCallback(async (s: AppState) => {
+    if (!isTauri()) return;
+    try {
+      const rows = gatherSecretPlaceholderRows(s);
+      const [resolutions, indexKeys] = await Promise.all([
+        resolveSecretPlaceholderRows(rows),
+        listSecretKeys(),
+      ]);
+      setSecretMissingByEnv(missingLogicalNamesByEnv(resolutions));
+      const orphans = findOrphanComposedKeysInIndex(indexKeys, s);
+      setOrphanCredentialKeys(orphans.length > 0 ? orphans : null);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   useEffect(() => {
     void (async () => {
       try {
@@ -363,11 +396,14 @@ export default function App() {
         }
         setState(next);
         setPaths(p);
+        if (isTauri()) {
+          void runSecretSyncForState(next);
+        }
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : String(e));
       }
     })();
-  }, []);
+  }, [runSecretSyncForState]);
 
   useEffect(() => {
     if (!state) return;
@@ -662,6 +698,15 @@ export default function App() {
           setStoredSecretLogicalNames((prev) =>
             prev.includes(key) ? prev : [...prev, key]
           );
+          setSecretMissingByEnv((prev) => {
+            const lid = activeEnv.id;
+            if (!prev[lid]?.includes(key)) return prev;
+            const rest = prev[lid].filter((x) => x !== key);
+            const next = { ...prev };
+            if (rest.length === 0) delete next[lid];
+            else next[lid] = rest;
+            return next;
+          });
           setSecretJustSavedRowIndex(rowIndex);
           setSecretSaveStamp((s) => s + 1);
         }
@@ -704,6 +749,15 @@ export default function App() {
         );
         await deleteSecret(k).catch(() => {});
         setStoredSecretLogicalNames((prev) => prev.filter((x) => x !== k));
+        setSecretMissingByEnv((prev) => {
+          const lid = activeEnv.id;
+          if (!prev[lid]?.includes(k)) return prev;
+          const rest = prev[lid].filter((x) => x !== k);
+          const next = { ...prev };
+          if (rest.length === 0) delete next[lid];
+          else next[lid] = rest;
+          return next;
+        });
       })();
     },
     [activeEnv]
@@ -808,6 +862,22 @@ export default function App() {
       }
     },
     [activeRequest, updateActiveRequest]
+  );
+
+  const closeOrphanCredentialDialog = useCallback(() => {
+    setOrphanCredentialKeys(null);
+  }, []);
+
+  const onRemoveOrphanCredentials = useCallback(
+    async (selected: string[]) => {
+      for (const k of selected) {
+        await deleteSecret(k).catch(() => {});
+      }
+      setOrphanCredentialKeys(null);
+      const s = stateRef.current;
+      if (s) await runSecretSyncForState(s);
+    },
+    [runSecretSyncForState]
   );
 
   const onSend = useCallback(async () => {
@@ -1016,10 +1086,11 @@ export default function App() {
         if (fid) next = { ...next, activeRequestId: fid };
       }
       setState(next);
+      if (isTauri()) void runSecretSyncForState(next);
     } catch (e) {
       setInfoToast(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [runSecretSyncForState]);
 
   const runImportReplaceWorkspace = useCallback(async () => {
     setImportReplaceDialogOpen(false);
@@ -1036,10 +1107,11 @@ export default function App() {
         if (fid) next = { ...next, activeRequestId: fid };
       }
       setState(next);
+      if (isTauri()) void runSecretSyncForState(next);
     } catch (e) {
       setInfoToast(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [runSecretSyncForState]);
 
   const onCreateRootFolder = useCallback(() => {
     setTreeDraft({ mode: "new-folder", parentId: null, value: "" });
@@ -1526,6 +1598,15 @@ export default function App() {
                 <div className="env-entries-grid" style={{ marginTop: 8 }}>
                   {(activeEnv?.variables ?? []).map((row, i) => {
                     const kind = getEntryKind(row);
+                    const secretRowMissing =
+                      kind === "secret" &&
+                      activeEnv &&
+                      row.key.trim() !== "" &&
+                      isLogicalSecretMissing(
+                        secretMissingByEnv,
+                        activeEnv.id,
+                        row.key.trim()
+                      );
                     return (
                       <div
                         className="env-entry-row"
@@ -1626,7 +1707,11 @@ export default function App() {
                             <span className="response-meta">{`Desktop only — use {{secret:${row.key || "name"}}} in requests`}</span>
                           ) : secretEditRowIndex === i ? (
                             <input
-                              className="env-entry-value-input"
+                              className={
+                                secretRowMissing
+                                  ? "env-entry-value-input env-entry-secret--missing"
+                                  : "env-entry-value-input"
+                              }
                               data-testid={`env-entry-secret-value-${i}`}
                               type="password"
                               autoComplete="off"
@@ -1663,7 +1748,9 @@ export default function App() {
                               className={
                                 secretJustSavedRowIndex === i
                                   ? "env-entry-secret-stored-btn env-entry-secret-stored-btn--saved"
-                                  : "env-entry-secret-stored-btn"
+                                  : secretRowMissing
+                                    ? "env-entry-secret-stored-btn env-entry-secret-stored-btn--missing"
+                                    : "env-entry-secret-stored-btn"
                               }
                               data-testid={`env-entry-secret-value-${i}`}
                               aria-label={
@@ -1692,7 +1779,11 @@ export default function App() {
                             </button>
                           ) : (
                             <input
-                              className="env-entry-value-input"
+                              className={
+                                secretRowMissing
+                                  ? "env-entry-value-input env-entry-secret--missing"
+                                  : "env-entry-value-input"
+                              }
                               data-testid={`env-entry-secret-value-${i}`}
                               type="password"
                               autoComplete="off"
@@ -2355,6 +2446,14 @@ export default function App() {
         open={importReplaceDialogOpen}
         onClose={() => setImportReplaceDialogOpen(false)}
         onConfirmReplace={runImportReplaceWorkspace}
+      />
+      <OrphanCredentialsDialog
+        open={
+          orphanCredentialKeys !== null && orphanCredentialKeys.length > 0
+        }
+        keys={orphanCredentialKeys ?? []}
+        onClose={closeOrphanCredentialDialog}
+        onRemoveSelected={onRemoveOrphanCredentials}
       />
       {htmlPreviewOpen && response ? (
         <HtmlPreviewModal

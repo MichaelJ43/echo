@@ -26,6 +26,7 @@ Colors are centralized on **` :root`** in `src/App.css`. **Prefer these variable
 | `--muted` | Secondary labels, hints, meta (timing, section chrome) | `#8b949e` |
 | `--accent` | Links, focus rings, sidebar “+ Folder”-style actions, tree selection emphasis | `#58a6ff` |
 | `--danger` | Errors, destructive actions, validation (e.g. invalid name) | `#f85149` |
+| `--warning` | Warnings, missing secret credentials (secret sync) | `#d29922` |
 | `--success` | Success status, positive inline actions (e.g. tree inline confirm ✓) | `#3fb950` |
 
 **Semantic usage (patterns):**
@@ -71,6 +72,7 @@ Colors are centralized on **` :root`** in `src/App.css`. **Prefer these variable
 - **Environment entries:** `.env-entry-row` uses a **narrow** kind column (`minmax(6.5rem, 9rem)`), then **name** and **value** columns (`1fr` / `2fr`) so long paths get space; **6px** gap.
 - **Environment entry placeholders:** Use lowercase **`name`** (key), **`value`** (variable and secret value fields; secret replace hint **`new value (replaces stored)`**), and **`path`** (file path). Do not mix `Value` / `value` for the same role.
 - **Secret saved feedback:** After a secret value is persisted (desktop), the stored row shows a short **Saved** state (success tint on the control, then reverts to **Stored** after a few seconds).
+- **Missing secret (desktop):** If a Secret entry is defined in the workspace but the value cannot be read from the OS credential store (secret sync on launch/import), the secret value control uses a **warning** border/background (`--warning` / derived tints)—distinct from success **Stored** and error **danger**.
 
 Keep new layouts **aligned to these multiples** (4 / 6 / 8 / 12) unless there is a strong reason to break rhythm.
 
