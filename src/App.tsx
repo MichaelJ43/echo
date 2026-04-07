@@ -1608,8 +1608,8 @@ export default function App() {
                               autoFocus
                               placeholder={
                                 storedSecretLogicalNames.includes(row.key)
-                                  ? "New value (replaces stored)"
-                                  : "Value"
+                                  ? "new value (replaces stored)"
+                                  : "value"
                               }
                               aria-label="Secret value"
                               value={secretValueDraft}
@@ -1653,7 +1653,7 @@ export default function App() {
                               data-testid={`env-entry-secret-value-${i}`}
                               type="password"
                               autoComplete="off"
-                              placeholder="Value"
+                              placeholder="value"
                               aria-label="Secret value"
                               value={secretEditRowIndex === i ? secretValueDraft : ""}
                               onChange={(e) => {
