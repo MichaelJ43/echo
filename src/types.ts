@@ -1,7 +1,12 @@
+/** Row in an environment: `{{key}}` substitution (variable, file path) or secret name (keychain; UI only until wired). */
+export type EnvironmentEntryKind = "variable" | "file" | "secret";
+
 export type KeyValue = {
   key: string;
   value: string;
   enabled: boolean;
+  /** Defaults to `variable`. `secret` rows do not participate in `{{key}}` substitution. */
+  entryKind?: EnvironmentEntryKind;
 };
 
 export type AuthConfig =

@@ -68,6 +68,7 @@ Colors are centralized on **` :root`** in `src/App.css`. **Prefer these variable
 - **Request panel:** **12px** padding, **12px** gap between sections (flex column).
 - **Tree:** **8px 4px** outer padding; row padding **4px 8px**; **6px** gap between chevron/icon and label.
 - **Form rows:** grids like `.kv-row` use **6px** gaps; inputs often **6px 8px** vertical padding inside fields.
+- **Environment entries:** `.env-entry-row` uses a **narrow** kind column (`minmax(6.5rem, 9rem)`), then **name** and **value** columns (`1fr` / `2fr`) so long paths get space; **6px** gap.
 
 Keep new layouts **aligned to these multiples** (4 / 6 / 8 / 12) unless there is a strong reason to break rhythm.
 

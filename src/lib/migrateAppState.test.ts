@@ -67,4 +67,20 @@ describe("migrateAppState", () => {
     if (r?.nodeType !== "request") return;
     expect(r.environmentId).toBe("e1");
   });
+
+  it("defaults entryKind to variable for legacy rows", () => {
+    const next = migrateAppState({
+      version: 1,
+      environments: [
+        {
+          id: "e1",
+          name: "Default",
+          variables: [{ key: "k", value: "v", enabled: true }],
+        },
+      ],
+      collections: [],
+      activeRequestId: null,
+    });
+    expect(next.environments[0]?.variables[0]?.entryKind).toBe("variable");
+  });
 });

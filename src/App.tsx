@@ -6,7 +6,10 @@ import {
   useRef,
   useState,
 } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type {
+  ChangeEvent as ReactChangeEvent,
+  MouseEvent as ReactMouseEvent,
+} from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -54,7 +57,15 @@ import {
   resolvedDraftName,
   type TreeInlineDraft,
 } from "./lib/treeDraft";
-import type { AppState, Environment, HttpResponsePayload, RequestItem } from "./types";
+import type {
+  AppState,
+  Environment,
+  EnvironmentEntryKind,
+  HttpResponsePayload,
+  KeyValue,
+  RequestItem,
+} from "./types";
+import { getEntryKind } from "./lib/variables";
 import { AboutDialog } from "./components/AboutDialog";
 import { ImportWorkspaceConfirmDialog } from "./components/ImportWorkspaceConfirmDialog";
 import { HtmlPreviewModal } from "./components/HtmlPreviewModal";
@@ -152,6 +163,8 @@ export default function App() {
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef<AppState | null>(null);
   const lastResponsesRef = useRef<Record<string, HttpResponsePayload>>({});
+  const pendingEnvFileRowIndex = useRef<number | null>(null);
+  const envFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const scheduler = startUpdateCheckScheduler((u) => {
@@ -344,6 +357,66 @@ export default function App() {
       state.environments.find((e) => e.id === id) ?? state.environments[0] ?? null
     );
   }, [state, activeRequest]);
+
+  const pickEnvironmentFilePath = useCallback(
+    (rowIndex: number) => {
+      if (!activeEnv || !activeRequest) return;
+      const envId = activeEnv.id;
+      if (isTauri()) {
+        void (async () => {
+          const selected = await open({ multiple: false, directory: false });
+          if (selected === null) return;
+          const path = Array.isArray(selected) ? selected[0]! : selected;
+          setState((s) => {
+            if (!s) return s;
+            const env = s.environments.find((e) => e.id === envId);
+            if (!env) return s;
+            const vars = [...env.variables];
+            const row = vars[rowIndex];
+            if (!row || getEntryKind(row) !== "file") return s;
+            vars[rowIndex] = { ...row, value: path };
+            return {
+              ...s,
+              environments: s.environments.map((e) =>
+                e.id === envId ? { ...e, variables: vars } : e
+              ),
+            };
+          });
+        })();
+      } else {
+        pendingEnvFileRowIndex.current = rowIndex;
+        envFileInputRef.current?.click();
+      }
+    },
+    [activeEnv, activeRequest]
+  );
+
+  const onBrowserEnvFileChosen = useCallback(
+    (e: ReactChangeEvent<HTMLInputElement>) => {
+      const ix = pendingEnvFileRowIndex.current;
+      pendingEnvFileRowIndex.current = null;
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f || ix === null || !activeEnv || !activeRequest) return;
+      const envId = activeEnv.id;
+      setState((s) => {
+        if (!s) return s;
+        const env = s.environments.find((e) => e.id === envId);
+        if (!env) return s;
+        const vars = [...env.variables];
+        const row = vars[ix];
+        if (!row || getEntryKind(row) !== "file") return s;
+        vars[ix] = { ...row, value: f.name };
+        return {
+          ...s,
+          environments: s.environments.map((e) =>
+            e.id === envId ? { ...e, variables: vars } : e
+          ),
+        };
+      });
+    },
+    [activeEnv, activeRequest]
+  );
 
   const response: HttpResponsePayload | null = useMemo(() => {
     if (!state?.activeRequestId) return null;
@@ -561,8 +634,16 @@ export default function App() {
                   if (env.id !== req.environmentId) return env;
                   const vars = [...env.variables];
                   const ix = vars.findIndex((v) => v.key === key);
-                  if (ix >= 0) vars[ix] = { ...vars[ix], value, enabled: true };
-                  else vars.push({ key, value, enabled: true });
+                  if (ix >= 0) {
+                    vars[ix] = { ...vars[ix], value, enabled: true };
+                  } else {
+                    vars.push({
+                      key,
+                      value,
+                      enabled: true,
+                      entryKind: "variable",
+                    });
+                  }
                   return { ...env, variables: vars };
                 }),
               };
@@ -1118,8 +1199,9 @@ export default function App() {
                 <h3>Environment</h3>
                 <p className="response-meta env-scope-hint">
                   This request uses the selected environment for{" "}
-                  <code>{"{{variables}}"}</code>. Other requests keep their own
-                  choice.
+                  <code>{"{{name}}"}</code> (variables and file paths) and{" "}
+                  <code>{"{{secret:name}}"}</code> on desktop. Other requests keep
+                  their own choice.
                 </p>
                 <div className="env-toolbar">
                   <select
@@ -1170,98 +1252,202 @@ export default function App() {
                     Delete
                   </button>
                 </div>
-                <div className="kv-grid" style={{ marginTop: 8 }}>
-                  {(activeEnv?.variables ?? []).map((row, i) => (
-                    <div className="kv-row" key={`${row.key}-${i}`}>
-                      <input
-                        type="checkbox"
-                        checked={row.enabled}
-                        onChange={(e) => {
-                          const vars = [...(activeEnv?.variables ?? [])];
-                          vars[i] = { ...row, enabled: e.target.checked };
-                          setState((s) => {
-                            if (!s || !activeEnv) return s;
-                            return {
-                              ...s,
-                              environments: s.environments.map((env) =>
-                                env.id === activeEnv.id
-                                  ? { ...env, variables: vars }
-                                  : env
-                              ),
-                            };
-                          });
-                        }}
-                      />
-                      <input
-                        placeholder="variable"
-                        value={row.key}
-                        onChange={(e) => {
-                          const vars = [...(activeEnv?.variables ?? [])];
-                          vars[i] = { ...row, key: e.target.value };
-                          setState((s) => {
-                            if (!s || !activeEnv) return s;
-                            return {
-                              ...s,
-                              environments: s.environments.map((env) =>
-                                env.id === activeEnv.id
-                                  ? { ...env, variables: vars }
-                                  : env
-                              ),
-                            };
-                          });
-                        }}
-                      />
-                      <input
-                        placeholder="value"
-                        value={row.value}
-                        onChange={(e) => {
-                          const vars = [...(activeEnv?.variables ?? [])];
-                          vars[i] = { ...row, value: e.target.value };
-                          setState((s) => {
-                            if (!s || !activeEnv) return s;
-                            return {
-                              ...s,
-                              environments: s.environments.map((env) =>
-                                env.id === activeEnv.id
-                                  ? { ...env, variables: vars }
-                                  : env
-                              ),
-                            };
-                          });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const vars = (activeEnv?.variables ?? []).filter(
-                            (_, j) => j !== i
-                          );
-                          setState((s) => {
-                            if (!s || !activeEnv) return s;
-                            return {
-                              ...s,
-                              environments: s.environments.map((env) =>
-                                env.id === activeEnv.id
-                                  ? { ...env, variables: vars }
-                                  : env
-                              ),
-                            };
-                          });
-                        }}
+                <input
+                  ref={envFileInputRef}
+                  type="file"
+                  className="sr-only"
+                  aria-hidden
+                  tabIndex={-1}
+                  onChange={onBrowserEnvFileChosen}
+                />
+                <div className="env-entries-grid" style={{ marginTop: 8 }}>
+                  {(activeEnv?.variables ?? []).map((row, i) => {
+                    const kind = getEntryKind(row);
+                    return (
+                      <div
+                        className="env-entry-row"
+                        key={`${activeEnv?.id ?? "env"}-${i}-${row.key}`}
                       >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                        <input
+                          type="checkbox"
+                          title="Enabled"
+                          checked={row.enabled}
+                          onChange={(e) => {
+                            const vars = [...(activeEnv?.variables ?? [])];
+                            vars[i] = { ...row, enabled: e.target.checked };
+                            setState((s) => {
+                              if (!s || !activeEnv) return s;
+                              return {
+                                ...s,
+                                environments: s.environments.map((env) =>
+                                  env.id === activeEnv.id
+                                    ? { ...env, variables: vars }
+                                    : env
+                                ),
+                              };
+                            });
+                          }}
+                        />
+                        <select
+                          className="env-entry-kind-select"
+                          aria-label="Entry kind"
+                          data-testid={`env-entry-kind-${i}`}
+                          value={kind}
+                          onChange={(e) => {
+                            const next = e.target.value as EnvironmentEntryKind;
+                            const vars = [...(activeEnv?.variables ?? [])];
+                            const prev = vars[i]!;
+                            const prevKind = getEntryKind(prev);
+                            const nextValue =
+                              next === "secret" || prevKind === "secret"
+                                ? ""
+                                : prev.value;
+                            vars[i] = {
+                              ...prev,
+                              entryKind: next,
+                              value: nextValue,
+                            };
+                            setState((s) => {
+                              if (!s || !activeEnv) return s;
+                              return {
+                                ...s,
+                                environments: s.environments.map((env) =>
+                                  env.id === activeEnv.id
+                                    ? { ...env, variables: vars }
+                                    : env
+                                ),
+                              };
+                            });
+                          }}
+                        >
+                          <option value="variable">Variable</option>
+                          <option value="file">File</option>
+                          <option value="secret">Secret</option>
+                        </select>
+                        <input
+                          className="env-entry-name-input"
+                          placeholder="name"
+                          data-testid={`env-entry-name-${i}`}
+                          value={row.key}
+                          onChange={(e) => {
+                            const vars = [...(activeEnv?.variables ?? [])];
+                            vars[i] = { ...row, key: e.target.value };
+                            setState((s) => {
+                              if (!s || !activeEnv) return s;
+                              return {
+                                ...s,
+                                environments: s.environments.map((env) =>
+                                  env.id === activeEnv.id
+                                    ? { ...env, variables: vars }
+                                    : env
+                                ),
+                              };
+                            });
+                          }}
+                        />
+                        {kind === "secret" ? (
+                          <div
+                            className="env-entry-secret-val"
+                            title="Secret values will be stored in the OS keychain; wiring comes in a follow-up."
+                          >
+                            <span className="env-entry-secret-mask" aria-hidden>
+                              ••••••••
+                            </span>
+                            <span className="env-entry-secret-hint">Keychain</span>
+                          </div>
+                        ) : kind === "file" ? (
+                          <div className="env-entry-value-with-browse">
+                            <input
+                              className="env-entry-value-input"
+                              placeholder="path"
+                              data-testid={`env-entry-value-${i}`}
+                              value={row.value}
+                              onChange={(e) => {
+                                const vars = [...(activeEnv?.variables ?? [])];
+                                vars[i] = { ...row, value: e.target.value };
+                                setState((s) => {
+                                  if (!s || !activeEnv) return s;
+                                  return {
+                                    ...s,
+                                    environments: s.environments.map((env) =>
+                                      env.id === activeEnv.id
+                                        ? { ...env, variables: vars }
+                                        : env
+                                    ),
+                                  };
+                                });
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="env-entry-browse-btn"
+                              data-testid={`env-entry-browse-${i}`}
+                              title="Choose file"
+                              onClick={() => pickEnvironmentFilePath(i)}
+                            >
+                              …
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            className="env-entry-value-input"
+                            placeholder="value"
+                            data-testid={`env-entry-value-${i}`}
+                            value={row.value}
+                            onChange={(e) => {
+                              const vars = [...(activeEnv?.variables ?? [])];
+                              vars[i] = { ...row, value: e.target.value };
+                              setState((s) => {
+                                if (!s || !activeEnv) return s;
+                                return {
+                                  ...s,
+                                  environments: s.environments.map((env) =>
+                                    env.id === activeEnv.id
+                                      ? { ...env, variables: vars }
+                                      : env
+                                  ),
+                                };
+                              });
+                            }}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className="env-entry-remove-btn"
+                          title="Remove"
+                          onClick={() => {
+                            const vars = (activeEnv?.variables ?? []).filter(
+                              (_, j) => j !== i
+                            );
+                            setState((s) => {
+                              if (!s || !activeEnv) return s;
+                              return {
+                                ...s,
+                                environments: s.environments.map((env) =>
+                                  env.id === activeEnv.id
+                                    ? { ...env, variables: vars }
+                                    : env
+                                ),
+                              };
+                            });
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
+                    data-testid="add-environment-entry"
                     onClick={() => {
                       setState((s) => {
                         if (!s || !activeEnv) return s;
-                        const row = {
+                        const row: KeyValue = {
                           key: "",
                           value: "",
                           enabled: true,
+                          entryKind: "variable",
                         };
                         return {
                           ...s,
@@ -1274,7 +1460,7 @@ export default function App() {
                       });
                     }}
                   >
-                    + Variable
+                    + Entry
                   </button>
                 </div>
               </div>
