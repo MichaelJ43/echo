@@ -55,6 +55,9 @@ pub struct HttpRequestConfig {
     pub body_type: String,
     pub auth: AuthConfig,
     pub variables: HashMap<String, String>,
+    /// Active environment id (UUID) for `{{secret:name}}` → `echo_<id>_name` keychain lookup.
+    #[serde(default)]
+    pub environment_id: String,
     #[serde(default)]
     pub multipart_parts: Option<Vec<MultipartPartPayload>>,
     #[serde(default)]
@@ -88,7 +91,7 @@ fn secret_placeholder_regex() -> &'static Regex {
 }
 
 /// Replaces `{{secret:NAME}}` with keychain values; collects substituted values for log masking.
-fn apply_secret_placeholders(s: &str) -> Result<(String, Vec<String>), String> {
+fn apply_secret_placeholders(s: &str, environment_id: &str) -> Result<(String, Vec<String>), String> {
     let re = secret_placeholder_regex();
     let mut out = s.to_string();
     let mut acc = Vec::new();
@@ -98,7 +101,7 @@ fn apply_secret_placeholders(s: &str) -> Result<(String, Vec<String>), String> {
         };
         let name = cap.get(1).unwrap().as_str();
         let full = cap.get(0).unwrap().as_str();
-        let val = secrets::get_secret(name)?;
+        let val = secrets::get_secret_for_placeholder(environment_id, name)?;
         acc.push(val.clone());
         out = out.replacen(full, &val, 1);
     }
@@ -108,9 +111,10 @@ fn apply_secret_placeholders(s: &str) -> Result<(String, Vec<String>), String> {
 fn substitute_env_and_secrets(
     s: &str,
     vars: &HashMap<String, String>,
+    environment_id: &str,
 ) -> Result<(String, Vec<String>), String> {
     let after_env = substitute(s, vars);
-    apply_secret_placeholders(&after_env)
+    apply_secret_placeholders(&after_env, environment_id)
 }
 
 fn merge_secret_vecs(mask_acc: &mut Vec<String>, mut extra: Vec<String>) {
@@ -135,14 +139,15 @@ fn append_query(
     url: &mut Url,
     query: &[KeyValue],
     vars: &HashMap<String, String>,
+    environment_id: &str,
     mask_acc: &mut Vec<String>,
 ) -> Result<(), String> {
     for q in query {
         if !q.enabled || q.key.is_empty() {
             continue;
         }
-        let (k, sec_k) = substitute_env_and_secrets(&q.key, vars)?;
-        let (v, sec_v) = substitute_env_and_secrets(&q.value, vars)?;
+        let (k, sec_k) = substitute_env_and_secrets(&q.key, vars, environment_id)?;
+        let (v, sec_v) = substitute_env_and_secrets(&q.value, vars, environment_id)?;
         merge_secret_vecs(mask_acc, sec_k);
         merge_secret_vecs(mask_acc, sec_v);
         url.query_pairs_mut().append_pair(&k, &v);
@@ -154,9 +159,10 @@ fn build_base_url(
     raw: &str,
     query: &[KeyValue],
     vars: &HashMap<String, String>,
+    environment_id: &str,
     mask_acc: &mut Vec<String>,
 ) -> Result<Url, String> {
-    let (resolved, sec) = substitute_env_and_secrets(raw, vars)?;
+    let (resolved, sec) = substitute_env_and_secrets(raw, vars, environment_id)?;
     merge_secret_vecs(mask_acc, sec);
     let mut url = Url::parse(&resolved).map_err(|e| {
         format!(
@@ -164,7 +170,7 @@ fn build_base_url(
             mask_for_log(&resolved, mask_acc)
         )
     })?;
-    append_query(&mut url, query, vars, mask_acc)?;
+    append_query(&mut url, query, vars, environment_id, mask_acc)?;
     Ok(url)
 }
 
@@ -173,6 +179,7 @@ fn build_base_url(
 /// is configured in `.github/codeql/codeql-config.yml` and applied via `.github/workflows/codeql.yml`.
 pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePayload, String> {
     let mut mask_acc: Vec<String> = Vec::new();
+    let environment_id = config.environment_id.as_str();
 
     let client = http_client();
 
@@ -180,6 +187,7 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
         &config.url,
         &config.query_params,
         &config.variables,
+        environment_id,
         &mut mask_acc,
     )?;
 
@@ -190,8 +198,8 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     } = &config.auth
     {
         if add_to == "query" {
-            let (k, sec_k) = substitute_env_and_secrets(key, &config.variables)?;
-            let (v, sec_v) = substitute_env_and_secrets(value, &config.variables)?;
+            let (k, sec_k) = substitute_env_and_secrets(key, &config.variables, environment_id)?;
+            let (v, sec_v) = substitute_env_and_secrets(value, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec_k);
             merge_secret_vecs(&mut mask_acc, sec_v);
             url.query_pairs_mut().append_pair(&k, &v);
@@ -207,8 +215,8 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
         if !h.enabled || h.key.is_empty() {
             continue;
         }
-        let (name, sec_n) = substitute_env_and_secrets(&h.key, &config.variables)?;
-        let (value, sec_v) = substitute_env_and_secrets(&h.value, &config.variables)?;
+        let (name, sec_n) = substitute_env_and_secrets(&h.key, &config.variables, environment_id)?;
+        let (value, sec_v) = substitute_env_and_secrets(&h.value, &config.variables, environment_id)?;
         merge_secret_vecs(&mut mask_acc, sec_n);
         merge_secret_vecs(&mut mask_acc, sec_v);
         req = req.header(name, value);
@@ -217,13 +225,13 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
     match &config.auth {
         AuthConfig::None => {}
         AuthConfig::Bearer { token } => {
-            let (t, sec) = substitute_env_and_secrets(token, &config.variables)?;
+            let (t, sec) = substitute_env_and_secrets(token, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec);
             req = req.bearer_auth(t);
         }
         AuthConfig::Basic { username, password } => {
-            let (u, sec_u) = substitute_env_and_secrets(username, &config.variables)?;
-            let (p, sec_p) = substitute_env_and_secrets(password, &config.variables)?;
+            let (u, sec_u) = substitute_env_and_secrets(username, &config.variables, environment_id)?;
+            let (p, sec_p) = substitute_env_and_secrets(password, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec_u);
             merge_secret_vecs(&mut mask_acc, sec_p);
             req = req.basic_auth(u, Some(p));
@@ -234,8 +242,8 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
             add_to,
         } => {
             if add_to == "header" {
-                let (k, sec_k) = substitute_env_and_secrets(key, &config.variables)?;
-                let (v, sec_v) = substitute_env_and_secrets(value, &config.variables)?;
+                let (k, sec_k) = substitute_env_and_secrets(key, &config.variables, environment_id)?;
+                let (v, sec_v) = substitute_env_and_secrets(value, &config.variables, environment_id)?;
                 merge_secret_vecs(&mut mask_acc, sec_k);
                 merge_secret_vecs(&mut mask_acc, sec_v);
                 req = req.header(k, v);
@@ -254,12 +262,12 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
                 if !p.enabled || p.key.trim().is_empty() {
                     continue;
                 }
-                let (key, sec_k) = substitute_env_and_secrets(&p.key, &config.variables)?;
+                let (key, sec_k) = substitute_env_and_secrets(&p.key, &config.variables, environment_id)?;
                 merge_secret_vecs(&mut mask_acc, sec_k);
                 match p.part_kind.as_str() {
                     "text" => {
                         let raw = p.text.as_deref().unwrap_or("");
-                        let (text, sec) = substitute_env_and_secrets(raw, &config.variables)?;
+                        let (text, sec) = substitute_env_and_secrets(raw, &config.variables, environment_id)?;
                         merge_secret_vecs(&mut mask_acc, sec);
                         form = form.text(key, text);
                     }
@@ -267,7 +275,7 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
                         let path_raw = p.file_path.as_ref().ok_or_else(|| {
                             "Multipart file part missing filePath.".to_string()
                         })?;
-                        let (path_res, sec) = substitute_env_and_secrets(path_raw, &config.variables)?;
+                        let (path_res, sec) = substitute_env_and_secrets(path_raw, &config.variables, environment_id)?;
                         merge_secret_vecs(&mut mask_acc, sec);
                         let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
                             // Avoid embedding OS paths in user-visible errors (CodeQL, privacy).
@@ -302,7 +310,7 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
                 .binary_body
                 .as_ref()
                 .ok_or_else(|| "binary body requires binaryBody".to_string())?;
-            let (path_res, sec) = substitute_env_and_secrets(&bb.path, &config.variables)?;
+            let (path_res, sec) = substitute_env_and_secrets(&bb.path, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec);
             let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
                 format!(
@@ -318,12 +326,12 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
                 .as_deref()
                 .filter(|s| !s.is_empty())
                 .unwrap_or("application/octet-stream");
-            let (ct_exp, sec_ct) = substitute_env_and_secrets(ct_raw, &config.variables)?;
+            let (ct_exp, sec_ct) = substitute_env_and_secrets(ct_raw, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec_ct);
             req.header(reqwest::header::CONTENT_TYPE, ct_exp).body(bytes)
         }
         "json" | "raw" if !config.body.is_empty() => {
-            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables)?;
+            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec);
             if config.body_type == "json" {
                 req.header(
@@ -336,7 +344,7 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
             }
         }
         "form" if !config.body.is_empty() => {
-            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables)?;
+            let (b, sec) = substitute_env_and_secrets(&config.body, &config.variables, environment_id)?;
             merge_secret_vecs(&mut mask_acc, sec);
             req.header(
                 reqwest::header::CONTENT_TYPE,
@@ -405,7 +413,14 @@ mod tests {
             enabled: true,
         }];
         let mut acc = Vec::new();
-        let u = build_base_url("https://httpbin.org/get", &q, &HashMap::new(), &mut acc).unwrap();
+        let u = build_base_url(
+            "https://httpbin.org/get",
+            &q,
+            &HashMap::new(),
+            "",
+            &mut acc,
+        )
+        .unwrap();
         assert!(u.as_str().contains("a=1"));
     }
 

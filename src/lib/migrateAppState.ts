@@ -14,6 +14,13 @@ function normalizeVariables(vars: KeyValue[]): KeyValue[] {
   }));
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(s: string): boolean {
+  return s.length === 36 && UUID_RE.test(s);
+}
+
 /**
  * Normalize workspace JSON from disk or older versions: per-request `environmentId`,
  * at least one environment, no dangling env refs.
@@ -30,6 +37,15 @@ export function migrateAppState(state: unknown): AppState {
     ...env,
     variables: normalizeVariables(env.variables ?? []),
   }));
+
+  const envIdRemap = new Map<string, string>();
+  environments = environments.map((env) => {
+    if (isUuid(env.id)) return env;
+    const newId = crypto.randomUUID();
+    envIdRemap.set(env.id, newId);
+    return { ...env, id: newId };
+  });
+
   const defaultEnvId = environments[0]!.id;
   const legacyActive =
     typeof s.activeEnvironmentId === "string" ? s.activeEnvironmentId : null;
@@ -40,8 +56,9 @@ export function migrateAppState(state: unknown): AppState {
 
   collections = mapEveryRequest(collections, (r) => {
     const cur = r as RequestItem & { environmentId?: string };
-    if (cur.environmentId) return { ...r, environmentId: cur.environmentId };
-    return { ...r, environmentId: legacyActive ?? defaultEnvId };
+    let eid = cur.environmentId ?? legacyActive ?? defaultEnvId;
+    eid = envIdRemap.get(eid) ?? eid;
+    return { ...r, environmentId: eid };
   });
 
   const envIds = new Set(environments.map((e) => e.id));

@@ -15,15 +15,11 @@ test.describe("Sidebar Menu (meta menu)", () => {
 
     await expect(menu.getByTestId("meta-menu-check-updates")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-view-releases")).toBeVisible();
-    await expect(menu.getByTestId("meta-menu-secrets")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-export-workspace")).toBeVisible();
     await expect(menu.getByTestId("meta-menu-about")).toBeVisible();
 
     await expect(menu.getByRole("button", { name: "Check for updates" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "View releases" })).toBeVisible();
-    await expect(
-      menu.getByRole("button", { name: "Manage local secrets" })
-    ).toBeVisible();
     await expect(menu.getByRole("button", { name: "Export workspace" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "About Echo" })).toBeVisible();
   });
@@ -52,19 +48,6 @@ test.describe("Sidebar Menu (meta menu)", () => {
     await expect(page.getByTestId("about-dialog")).toBeHidden();
   });
 
-  test("web build: Manage local secrets shows toast instead of modal", async ({
-    page,
-  }) => {
-    await gotoLoaded(page);
-
-    await page.getByTestId("sidebar-menu-trigger").click();
-    await page.getByTestId("meta-menu-secrets").click();
-
-    await expect(page.getByTestId("secrets-dialog")).toHaveCount(0);
-    await expect(page.getByTestId("update-info-toast")).toContainText(
-      /desktop app/i
-    );
-  });
 });
 
 test.describe("Folder tree context menus", () => {

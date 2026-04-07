@@ -7,11 +7,13 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: vi.fn(),
 }));
 
+const MOCK_ENV_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
 vi.mock("./api", () => ({
   openContainingFolder: vi.fn(),
   loadState: vi.fn(async () => ({
     version: 1,
-    environments: [{ id: "e1", name: "Default", variables: [] }],
+    environments: [{ id: MOCK_ENV_ID, name: "Default", variables: [] }],
     collections: [
       {
         nodeType: "folder",
@@ -22,7 +24,7 @@ vi.mock("./api", () => ({
             nodeType: "request",
             id: "r1",
             name: "Test",
-            environmentId: "e1",
+            environmentId: MOCK_ENV_ID,
             method: "GET",
             url: "https://example.com",
             headers: [],
@@ -45,6 +47,9 @@ vi.mock("./api", () => ({
   })),
   importWorkspaceFile: vi.fn(),
   exportWorkspaceFile: vi.fn(),
+  listSecretLogicalNamesForEnvironment: vi.fn(async () => []),
+  deleteSecret: vi.fn(),
+  setSecret: vi.fn(),
 }));
 
 describe("App", () => {

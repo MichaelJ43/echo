@@ -82,6 +82,14 @@ fn list_secret_keys(app: tauri::AppHandle) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn list_secret_logical_names_for_env(
+    app: tauri::AppHandle,
+    environment_id: String,
+) -> Result<Vec<String>, String> {
+    secrets::list_secret_logical_names_for_env(&app, &environment_id)
+}
+
+#[tauri::command]
 fn set_secret(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
     secrets::set_secret(&app, key, value)
 }
@@ -109,6 +117,7 @@ pub fn run() {
             open_external_url,
             open_containing_folder,
             list_secret_keys,
+            list_secret_logical_names_for_env,
             set_secret,
             delete_secret
         ])
