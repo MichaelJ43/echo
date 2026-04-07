@@ -10,6 +10,9 @@ pub struct KeyValue {
     pub key: String,
     pub value: String,
     pub enabled: bool,
+    /// Environment entry kind: `variable` | `file` | `secret`. Omitted for headers/query params.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,4 +172,23 @@ pub fn export_to_path(path: &Path, state: &AppState) -> Result<(), String> {
 pub fn import_from_path(path: &Path) -> Result<AppState, String> {
     let raw = fs::read_to_string(path).map_err(|e| e.to_string())?;
     serde_json::from_str(&raw).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_value_entry_kind_roundtrips_json() {
+        let kv = KeyValue {
+            key: "k".into(),
+            value: "".into(),
+            enabled: true,
+            entry_kind: Some("secret".into()),
+        };
+        let json = serde_json::to_string(&kv).unwrap();
+        assert!(json.contains("entryKind"));
+        let back: KeyValue = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.entry_kind.as_deref(), Some("secret"));
+    }
 }
