@@ -26,7 +26,8 @@ Define variables in the **Environment** section. Use `{{variableName}}` in the U
 
 Each **request** has its own **environment** choice in the dropdown (Add, Rename, Duplicate, and Delete manage the shared environment definitions). Changing the environment for one request does not change other requests. Multiple requests can share the same environment definition; editing variables for that definition updates it for every request that uses it.
 
-On the **desktop app**, add **Secret** rows in the **Environment → Entries** table for each sensitive value and reference them with `{{secret:NAME}}` in the same places as variables. `NAME` may contain letters, digits, underscores, hyphens, and periods (for example `API_TOKEN`, `api-key`, `stripe.secret`). Those values are never written into exported workspace JSON; Echo reads them from the OS credential manager only when you send a request. **Deleting an environment** removes all composed keychain entries for that environment’s id (`echo_<environmentId>_…`) so secrets are not left behind as orphans.
+On the **desktop app**, add **Secret** rows in the **Environment → Entries** table for each sensitive value and reference them with `{{secret:NAME}}` in the same places as variables. `NAME` may contain letters, digits, underscores, hyphens, and periods (for example `API_TOKEN`, `api-key`, `stripe.secret`). Those values are never written into exported workspace JSON; Echo reads them from the OS credential manager only when you send a request. **Deleting an environment** removes all composed keychain entries for that environment’s id (`echo_<environmentId>_…`) so secrets are not left behind as orphans. **Changing an entry’s kind** (Variable / File / Secret) clears its value; switching **from** Secret removes stored credentials for that row’s name from the keychain.
+
 
 ## Authentication
 
