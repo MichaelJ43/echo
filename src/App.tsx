@@ -670,6 +670,23 @@ export default function App() {
     [activeEnv]
   );
 
+  /** Remove keychain + index entry for a secret logical name (composed + legacy). */
+  const removeStoredSecretForLogicalKey = useCallback(
+    (logicalKey: string) => {
+      if (!activeEnv || !isTauri()) return;
+      const k = logicalKey.trim();
+      if (!k) return;
+      void (async () => {
+        await deleteSecret(composeSecretStorageKey(activeEnv.id, k)).catch(
+          () => {}
+        );
+        await deleteSecret(k).catch(() => {});
+        setStoredSecretLogicalNames((prev) => prev.filter((x) => x !== k));
+      })();
+    },
+    [activeEnv]
+  );
+
   const pickMultipartFilePath = useCallback(
     (rowIndex: number) => {
       if (!activeRequest) return;
@@ -1522,14 +1539,18 @@ export default function App() {
                             const vars = [...(activeEnv?.variables ?? [])];
                             const prev = vars[i]!;
                             const prevKind = getEntryKind(prev);
-                            const nextValue =
-                              next === "secret" || prevKind === "secret"
-                                ? ""
-                                : prev.value;
+                            if (next === prevKind) return;
+                            if (prevKind === "secret") {
+                              removeStoredSecretForLogicalKey(prev.key);
+                              if (secretEditRowIndex === i) {
+                                setSecretEditRowIndex(null);
+                                setSecretValueDraft("");
+                              }
+                            }
                             vars[i] = {
                               ...prev,
                               entryKind: next,
-                              value: nextValue,
+                              value: "",
                             };
                             setState((s) => {
                               if (!s || !activeEnv) return s;
@@ -1587,8 +1608,8 @@ export default function App() {
                               autoFocus
                               placeholder={
                                 storedSecretLogicalNames.includes(row.key)
-                                  ? "New value (replaces stored)"
-                                  : "Value"
+                                  ? "new value (replaces stored)"
+                                  : "value"
                               }
                               aria-label="Secret value"
                               value={secretValueDraft}
@@ -1632,7 +1653,7 @@ export default function App() {
                               data-testid={`env-entry-secret-value-${i}`}
                               type="password"
                               autoComplete="off"
-                              placeholder="Value"
+                              placeholder="value"
                               aria-label="Secret value"
                               value={secretEditRowIndex === i ? secretValueDraft : ""}
                               onChange={(e) => {
