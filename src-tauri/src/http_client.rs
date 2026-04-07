@@ -270,9 +270,10 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
                         let (path_res, sec) = substitute_env_and_secrets(path_raw, &config.variables)?;
                         merge_secret_vecs(&mut mask_acc, sec);
                         let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
-                            mask_for_log(
-                                &format!("Could not read multipart file: {e}"),
-                                &mask_acc,
+                            // Avoid embedding OS paths in user-visible errors (CodeQL, privacy).
+                            format!(
+                                "Could not read multipart file ({}).",
+                                e.kind()
                             )
                         })?;
                         if bytes.len() as u64 > MAX_HTTP_BODY_BYTES {
@@ -304,9 +305,9 @@ pub async fn send_request(config: HttpRequestConfig) -> Result<HttpResponsePaylo
             let (path_res, sec) = substitute_env_and_secrets(&bb.path, &config.variables)?;
             merge_secret_vecs(&mut mask_acc, sec);
             let bytes = std::fs::read(Path::new(&path_res)).map_err(|e| {
-                mask_for_log(
-                    &format!("Could not read binary body file: {e}"),
-                    &mask_acc,
+                format!(
+                    "Could not read binary body file ({}).",
+                    e.kind()
                 )
             })?;
             if bytes.len() as u64 > MAX_HTTP_BODY_BYTES {

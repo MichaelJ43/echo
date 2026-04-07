@@ -1,8 +1,13 @@
 # Echo is an HTTP client: reqwest sends HTTPS traffic with TLS when the URL uses
 # https://. CodeQL rust/cleartext-transmission flags secret/token substitution
 # flowing into req.send() as "cleartext" without modeling transport encryption.
-# Outbound error strings are masked in Rust (mask_for_log).
+#
+# rust/cleartext-logging: User-visible HTTP errors are built with mask_for_log() so
+# {{secret:}} keychain values never appear raw; CodeQL does not model that sanitizer.
+# File read failures use IoError::kind() only (no OS path in the message).
 name: "Echo CodeQL"
 query-filters:
   - exclude:
       id: rust/cleartext-transmission
+  - exclude:
+      id: rust/cleartext-logging
