@@ -411,6 +411,7 @@ mod tests {
             key: "a".to_string(),
             value: "1".to_string(),
             enabled: true,
+            entry_kind: None,
         }];
         let mut acc = Vec::new();
         let u = build_base_url(
